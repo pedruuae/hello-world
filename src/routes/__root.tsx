@@ -83,7 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { title: "Meu Corredor" },
       { name: "description", content: "Suas anotações de reposição, sempre à mão." },
-      { name: "theme-color", content: "#28543e" },
+      { name: "theme-color", content: "#2457d6" },
       { property: "og:title", content: "Meu Corredor" },
       { property: "og:description", content: "Suas anotações de reposição, sempre à mão." },
       { property: "og:type", content: "website" },

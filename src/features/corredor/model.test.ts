@@ -4,6 +4,9 @@ import {
   bring,
   clone,
   collect,
+  carried,
+  returned,
+  returnToDepot,
   defer,
   editItem,
   emptyData,
@@ -87,7 +90,7 @@ describe("quantidades da reposição", () => {
     const c = clone(d);
     c.products = [];
     expect(() => validate(c)).toThrow();
-    expect(() => validate({ ...d, version: 2 })).toThrow();
+    expect(() => validate({ ...d, version: 3 })).toThrow();
     expect(() => validate({ ...d, revision: -1 })).toThrow();
     expect(() => validate({ ...d, pending: [null] })).toThrow();
   });
@@ -100,5 +103,75 @@ describe("quantidades da reposição", () => {
     rename(d, p.id, "Novo nome");
     expect(d.load[0]!.productId).toBe(p.id);
     expect(d.products[0]!.name).toBe("Novo nome");
+  });
+});
+
+describe("devolução ao depósito", () => {
+  it("separa devolvidos, carregados e saldo sem duplicar ao corrigir", () => {
+    const d = emptyData();
+    add(d, "Coca-Cola 2 L", { closed: 5, open: 3 }, "", false);
+    const i = d.load[0]!;
+    collect(d, i.id, { closed: 3, open: 2 });
+    returnToDepot(d, i.id, { closed: 2, open: 1 });
+    returnToDepot(d, i.id, { closed: 2, open: 1 });
+    expect(carried(i)).toEqual({ closed: 1, open: 1 });
+    expect(returned(i)).toEqual({ closed: 2, open: 1 });
+    expect(remaining(i)).toEqual({ closed: 2, open: 1 });
+    expect(d.pending).toHaveLength(0);
+    defer(d, i.id);
+    expect(d.pending[0]).toMatchObject({ closed: 2, open: 1 });
+    expect(carried(i)).toEqual({ closed: 1, open: 1 });
+    bring(d, d.pending[0]!.id);
+    expect(d.load).toHaveLength(1);
+    expect(remaining(i)).toEqual({ closed: 2, open: 1 });
+    finish(d, true);
+    expect(d.pending).toHaveLength(1);
+    expect(d.pending[0]).toMatchObject({ closed: 2, open: 1 });
+  });
+  it("limita a devolução ao coletado e permite desfazer sem criar falta", () => {
+    const d = emptyData();
+    add(d, "Suco", { closed: 2, open: 1 }, "", false);
+    const i = d.load[0]!;
+    collect(d, i.id, i);
+    expect(() => returnToDepot(d, i.id, { closed: 3, open: 0 })).toThrow();
+    returnToDepot(d, i.id, i);
+    expect(carried(i)).toEqual({ closed: 0, open: 0 });
+    expect(() => collect(d, i.id, { closed: 0, open: 0 })).toThrow();
+    const invalid = clone(d);
+    invalid.load[0]!.returnedClosed = 3;
+    expect(() => validate(invalid)).toThrow();
+    returnToDepot(d, i.id, { closed: 0, open: 0 });
+    expect(carried(i)).toEqual({ closed: 2, open: 1 });
+    expect(remaining(i)).toEqual({ closed: 0, open: 0 });
+    returnToDepot(d, i.id, i);
+    finish(d, false);
+    expect(d.pending).toHaveLength(0);
+  });
+  it("migra dados e backups antigos sem perder nomes nem quantidades", () => {
+    const d = emptyData();
+    add(d, "Água 500 mL", { closed: 2, open: 0 }, "original", false);
+    const old = {
+      ...d,
+      version: 1,
+      load: d.load.map((i) => ({
+        id: i.id,
+        productId: i.productId,
+        closed: i.closed,
+        open: i.open,
+        gotClosed: i.gotClosed,
+        gotOpen: i.gotOpen,
+        note: i.note,
+      })),
+    };
+    const migrated = validate(old);
+    expect(migrated.version).toBe(2);
+    expect(migrated.load[0]).toMatchObject({
+      closed: 2,
+      gotClosed: 0,
+      returnedClosed: 0,
+      returnedOpen: 0,
+      note: "original",
+    });
+    expect(migrated.products).toEqual(d.products);
   });
 });

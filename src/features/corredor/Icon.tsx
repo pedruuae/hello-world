@@ -16,6 +16,16 @@ export function Icon({ name, size = 22 }: { name: string; size?: number }) {
         <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
       </>
     ),
+    return: (
+      <>
+        <path d="M9 5 4 10l5 5M4 10h10a5 5 0 0 1 0 10h-3" />
+      </>
+    ),
+    spark: (
+      <>
+        <path d="m13 2-8 12h6l-1 8 9-13h-6l0-7Z" />
+      </>
+    ),
     plus: <path d="M12 5v14M5 12h14" />,
     check: <path d="m5 12 4 4L19 6" />,
     back: <path d="m12 5-7 7 7 7M5 12h15" />,

@@ -66,3 +66,16 @@ Variáveis opcionais: `APP_URL`, `CHROME_EXECUTABLE`, `CHROME_ARGS` (array JSON)
 - Falha de escrita IndexedDB simulada: erro visível, dados anteriores preservados e formulário mantido; nenhum sucesso falso.
 - Viewports 320 e 360 px: sem rolagem horizontal. A navegação ocupa uma faixa própria e não cobre a lista. A viewport reduzida para 320 × 310 permitiu rolar até Salvar.
 - Não validado: Galaxy J7 físico, versão real do Chrome/Android, teclado virtual real, instalação Android e hospedagem publicada do Lovable. Os testes foram do build de produção servido localmente, não do editor/preview de desenvolvimento.
+
+
+## Devolução de fardos e visual — 08/10/2026
+
+Em **Na carga**, use **Realocar no depósito** e confirme os totais de fardos que já foram fisicamente devolvidos. Os campos mantêm a separação entre fechados e os que seriam abertos. Só devolva fardos inteiros. O app não controla unidades soltas.
+
+A seção **Devolvidos ao depósito** mantém o registro até finalizar a carga e permite corrigir a devolução. As quantidades devolvidas saem dos totais físicos da carga, mas nunca voltam automaticamente para buscar nem para pendências. A edição usa totais absolutos para evitar contagem duplicada. A coleta não pode ser reduzida abaixo do já devolvido: corrija a devolução primeiro. Finalizar encerra também o registro das devoluções desta carga.
+
+O formato dos dados/backup agora é **versão 2**, com migração de backups e dados v1. O banco IndexedDB continua na versão 1 porque as stores não mudaram. Versões antigas do app rejeitam backups v2 em vez de descartarem silenciosamente as devoluções. Não alteramos Supabase ou serviços externos.
+
+Visual: base azul, detalhes amarelos, saudação pessoal de teste “Olá, Pedro Daniel! O que vamos repor hoje?” e transições CSS curtas. Sem biblioteca de animação, efeitos contínuos ou recursos remotos. `prefers-reduced-motion` desativa os movimentos.
+
+Verificação adicional: 11 testes unitários/roteamento passaram. `scripts/returns-browser-test.cjs` verificou em produção migração v1, devolução parcial/total, correção repetida, desfazer, transferência exclusiva do saldo real, restauração de backup v2, recarga offline, largura 320 px e redução de movimento. Continua pendente validar o J7 físico.

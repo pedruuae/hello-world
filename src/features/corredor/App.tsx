@@ -5,6 +5,9 @@ import {
   bring,
   clone,
   collect,
+  carried,
+  returned,
+  returnToDepot,
   defer,
   editItem,
   emptyData,
@@ -29,7 +32,7 @@ type InstallEvent = Event & {
 };
 type Tab = "load" | "pending" | "products";
 type Editor = {
-  kind: "add" | "load" | "pending" | "collect" | "rename";
+  kind: "add" | "load" | "pending" | "collect" | "return" | "rename";
   id: string;
   name: string;
   volume: string;
@@ -231,6 +234,18 @@ export default function App() {
       maxOpen: i.open,
     });
   }
+  function editReturn(i: Item) {
+    openEditor({
+      ...freshEditor(),
+      kind: "return",
+      id: i.id,
+      name: nameOf(i),
+      closed: i.returnedClosed,
+      open: i.returnedOpen,
+      maxClosed: i.gotClosed,
+      maxOpen: i.gotOpen,
+    });
+  }
   function nameOf(i: Item | Pending) {
     return data.products.find((p) => p.id === i.productId)?.name || "Produto";
   }
@@ -239,7 +254,7 @@ export default function App() {
     if (!editor) return;
     let v = editor;
     try {
-      if (v.kind !== "collect")
+      if (v.kind !== "collect" && v.kind !== "return")
         v = {
           ...v,
           name: knownVolumeName(nameWithVolume(v.name, v.volume, v.unit), data.products),
@@ -268,10 +283,16 @@ export default function App() {
       (d) => {
         if (v.kind === "add") add(d, v.name, v, v.note, merge);
         else if (v.kind === "collect") collect(d, v.id, v);
+        else if (v.kind === "return") returnToDepot(d, v.id, v);
         else if (v.kind === "rename") rename(d, v.id, v.name);
         else editItem(d, v.kind, v.id, v.name, v, v.note);
       },
-      v.kind === "collect" ? "Coleta atualizada." : "Salvo no aparelho.",
+      v.kind === "return"
+        ? "Devolução registrada. Os fardos não viraram pendência."
+        : v.kind === "collect"
+          ? "Coleta atualizada."
+          : "Salvo no aparelho.",
+      v.kind === "return",
     );
     if (ok) {
       setEditor(null);
@@ -349,9 +370,11 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [editor]);
   const toGet = data.load.filter((i) => sum(remaining(i)) > 0),
-    inLoad = data.load.filter((i) => i.gotClosed + i.gotOpen > 0);
+    inLoad = data.load.filter((i) => sum(carried(i)) > 0),
+    inDepot = data.load.filter((i) => sum(returned(i)) > 0);
   const left = toGet.reduce((a, i) => a + sum(remaining(i)), 0),
-    got = inLoad.reduce((a, i) => a + i.gotClosed + i.gotOpen, 0);
+    got = inLoad.reduce((a, i) => a + sum(carried(i)), 0),
+    backInDepot = inDepot.reduce((a, i) => a + sum(returned(i)), 0);
   const names = data.products
     .filter((p) => normalize(p.name).includes(normalize(query)))
     .filter((p) => filter !== "favorites" || p.favorite)
@@ -501,26 +524,31 @@ export default function App() {
             <h1 ref={heading} tabIndex={-1}>
               {editor.kind === "add"
                 ? "Adicionar produto"
-                : editor.kind === "collect"
-                  ? "Quanto você pegou?"
-                  : editor.kind === "rename"
-                    ? "Editar nome"
-                    : "Editar produto"}
+                : editor.kind === "return"
+                  ? "Realocar no depósito"
+                  : editor.kind === "collect"
+                    ? "Quanto você pegou?"
+                    : editor.kind === "rename"
+                      ? "Editar nome"
+                      : "Editar produto"}
             </h1>
             <p className="intro">
-              {editor.kind === "collect"
-                ? "Informe o total já coletado, incluindo o que pegou antes."
-                : editor.kind === "rename"
-                  ? "O novo nome será usado também na carga e nas pendências."
-                  : "Anote os fardos que você precisa buscar."}
+              {editor.kind === "return"
+                ? "Informe o total de fardos já devolvidos, incluindo devoluções anteriores. Confirme só depois de levá-los de volta ao depósito."
+                : editor.kind === "collect"
+                  ? "Informe o total já coletado, incluindo o que pegou antes."
+                  : editor.kind === "rename"
+                    ? "O novo nome será usado também na carga e nas pendências."
+                    : "Anote os fardos que você precisa buscar."}
             </p>
             <form onSubmit={save}>
               <fieldset disabled={busy}>
-                {editor.kind === "collect" ? (
+                {editor.kind === "collect" || editor.kind === "return" ? (
                   <div className="form-product">
                     <h2>{editor.name}</h2>
                     <p>
-                      Solicitado: {editor.maxClosed} fechados · {editor.maxOpen} pra abrir
+                      {editor.kind === "return" ? "Já coletado:" : "Solicitado:"} {editor.maxClosed}{" "}
+                      fechados · {editor.maxOpen} pra abrir
                     </p>
                   </div>
                 ) : (
@@ -556,7 +584,7 @@ export default function App() {
                       ))}
                   </div>
                 )}
-                {editor.kind !== "collect" && (
+                {editor.kind !== "collect" && editor.kind !== "return" && (
                   <div className="volume-field">
                     <label className="field-label" htmlFor="product-volume">
                       Volume da bebida <span className="optional">opcional</span>
@@ -609,19 +637,25 @@ export default function App() {
                       />
                     </div>
                     <p className="hint">
-                      “Pra abrir” conta fardos, não unidades. Abra na área de vendas.
+                      {editor.kind === "return"
+                        ? "Devolva somente fardos inteiros. As categorias indicam como você pretendia repor."
+                        : "“Pra abrir” conta fardos, não unidades. Abra na área de vendas."}
                     </p>
                     <div className="form-total">
                       <span>
-                        {editor.kind === "collect" ? "Total coletado" : "Total para buscar"}
+                        {editor.kind === "return"
+                          ? "Total devolvido"
+                          : editor.kind === "collect"
+                            ? "Total coletado"
+                            : "Total para buscar"}
                       </span>
                       <strong>{(editor.closed || 0) + (editor.open || 0)} fardos</strong>
                     </div>
-                    {editor.kind === "collect" ? (
+                    {editor.kind === "collect" || editor.kind === "return" ? (
                       <p className="hint">
-                        Restante: {Math.max(0, (editor.maxClosed || 0) - (editor.closed || 0))}{" "}
-                        fechados · {Math.max(0, (editor.maxOpen || 0) - (editor.open || 0))} pra
-                        abrir
+                        {editor.kind === "return" ? "Fica na carga:" : "Restante:"}{" "}
+                        {Math.max(0, (editor.maxClosed || 0) - (editor.closed || 0))} fechados ·{" "}
+                        {Math.max(0, (editor.maxOpen || 0) - (editor.open || 0))} pra abrir
                       </p>
                     ) : (
                       <label className="field-label">
@@ -640,9 +674,11 @@ export default function App() {
                 <button className="primary full" type="submit">
                   {busy
                     ? "Salvando…"
-                    : editor.kind === "collect"
-                      ? "Salvar coleta"
-                      : "Salvar produto"}
+                    : editor.kind === "return"
+                      ? "Confirmar devolução"
+                      : editor.kind === "collect"
+                        ? "Salvar coleta"
+                        : "Salvar produto"}
                 </button>
               </fieldset>
             </form>
@@ -773,15 +809,22 @@ export default function App() {
               <Icon name="check" size={32} />
             </div>
             <h1 ref={heading} tabIndex={-1}>
-              Terminou a reposição?
+              Concluir esta carga?
             </h1>
             <p className="intro">
-              Finalize só depois de descer e repor os produtos. Pegar no depósito ainda não é repor.
+              Finalize depois de repor os produtos ou devolver os fardos que sobraram. Pegar no
+              depósito ainda não é repor.
             </p>
             <div className="summary-line">
-              <span>Coletados nesta carga</span>
+              <span>Fardos da carga para repor</span>
               <strong>{got} fardos</strong>
             </div>
+            {backInDepot > 0 && (
+              <div className="summary-line">
+                <span>Devolvidos ao depósito</span>
+                <strong>{backInDepot} fardos</strong>
+              </div>
+            )}
             {left > 0 && (
               <div className="alert">
                 Ainda faltam <strong>{left} fardos</strong>. Ao finalizar, somente esse saldo irá
@@ -807,6 +850,18 @@ export default function App() {
           </section>
         ) : (
           <>
+            {tab === "load" && (
+              <section className="welcome">
+                <div>
+                  <p className="welcome-kicker">BORA PRA MAIS UMA CARGA</p>
+                  <h2>Olá, Pedro Daniel!</h2>
+                  <p>O que vamos repor hoje?</p>
+                </div>
+                <span className="welcome-icon">
+                  <Icon name="spark" size={25} />
+                </span>
+              </section>
+            )}
             <div className="page-heading">
               <div>
                 <p className="eyebrow">
@@ -855,7 +910,9 @@ export default function App() {
                       {toGet.length === 0 ? (
                         <p className="inline-empty">
                           <Icon name="check" />
-                          Tudo coletado. Confira abaixo o que vai abrir.
+                          {got > 0
+                            ? "Tudo coletado. Confira abaixo o que vai abrir."
+                            : "Nenhum fardo para buscar. Confira as devoluções abaixo."}
                         </p>
                       ) : (
                         toGet.map((i) => (
@@ -872,7 +929,8 @@ export default function App() {
                             <Breakdown {...remaining(i)} />
                             {i.gotClosed + i.gotOpen > 0 && (
                               <p className="collected-note">
-                                Já na carga: {i.gotClosed} fechados · {i.gotOpen} pra abrir
+                                Na carga: {carried(i).closed} fechados · {carried(i).open} pra abrir
+                                {sum(returned(i)) > 0 && <> · {sum(returned(i))} devolvidos</>}
                               </p>
                             )}
                             {i.note && <p className="note">{i.note}</p>}
@@ -928,7 +986,11 @@ export default function App() {
                         Você já pegou. Abra os fardos indicados ao descer.
                       </p>
                       {inLoad.length === 0 ? (
-                        <p className="inline-empty">Os produtos coletados aparecerão aqui.</p>
+                        <p className="inline-empty">
+                          {backInDepot > 0
+                            ? "Os fardos coletados já foram devolvidos ao depósito."
+                            : "Os produtos coletados aparecerão aqui."}
+                        </p>
                       ) : (
                         inLoad.map((i) => (
                           <article className="item-card collected" key={i.id}>
@@ -940,13 +1002,13 @@ export default function App() {
                               </span>
                             </div>
                             <p className="item-total">
-                              <strong>{i.gotClosed + i.gotOpen} fardos</strong> na carga
+                              <strong>{sum(carried(i))} fardos</strong> na carga
                             </p>
-                            <Breakdown closed={i.gotClosed} open={i.gotOpen} />
-                            {i.gotOpen > 0 && (
+                            <Breakdown {...carried(i)} />
+                            {carried(i).open > 0 && (
                               <p className="opening-note">
-                                Abrir {i.gotOpen} {i.gotOpen === 1 ? "fardo" : "fardos"} na área de
-                                vendas
+                                Abrir {carried(i).open} {carried(i).open === 1 ? "fardo" : "fardos"}{" "}
+                                na área de vendas
                               </p>
                             )}
                             {sum(remaining(i)) > 0 && (
@@ -955,6 +1017,14 @@ export default function App() {
                               </p>
                             )}
                             {i.note && <p className="note">{i.note}</p>}
+                            <button
+                              className="secondary full return-button"
+                              disabled={busy}
+                              onClick={() => editReturn(i)}
+                            >
+                              <Icon name="return" size={18} />
+                              Realocar no depósito
+                            </button>
                             <div className="item-tools">
                               <button onClick={() => editCollection(i)}>Corrigir coleta</button>
                               <button
@@ -976,6 +1046,36 @@ export default function App() {
                         ))
                       )}
                     </section>
+                    {inDepot.length > 0 && (
+                      <section className="list-section returned-section">
+                        <div className="section-heading">
+                          <h2>Devolvidos ao depósito</h2>
+                          <span>{backInDepot} fardos</span>
+                        </div>
+                        <p className="section-help">
+                          Já voltaram. Não estão na carga nem nas pendências.
+                        </p>
+                        {inDepot.map((i) => (
+                          <article className="item-card returned" key={i.id}>
+                            <div className="item-top">
+                              <h3>{nameOf(i)}</h3>
+                              <span className="tag">
+                                <Icon name="return" size={14} />
+                                Devolvido
+                              </span>
+                            </div>
+                            <Breakdown {...returned(i)} />
+                            <button
+                              className="secondary full"
+                              disabled={busy}
+                              onClick={() => editReturn(i)}
+                            >
+                              Corrigir devolução
+                            </button>
+                          </article>
+                        ))}
+                      </section>
+                    )}
                     <button
                       className="secondary full finalize"
                       disabled={busy}

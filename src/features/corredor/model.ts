@@ -6,10 +6,12 @@ export type Item = Quantities & {
   note: string;
   gotClosed: number;
   gotOpen: number;
+  returnedClosed: number;
+  returnedOpen: number;
 };
 export type Pending = Quantities & { id: string; productId: string; note: string };
 export type Data = {
-  version: 1;
+  version: 2;
   revision: number;
   products: Product[];
   load: Item[];
@@ -17,7 +19,7 @@ export type Data = {
   finishedAt: number | null;
 };
 export const emptyData = (): Data => ({
-  version: 1,
+  version: 2,
   revision: 0,
   products: [],
   load: [],
@@ -35,6 +37,14 @@ export const id = () => Date.now().toString(36) + Math.random().toString(36).sli
 export const remaining = (i: Item): Quantities => ({
   closed: i.closed - i.gotClosed,
   open: i.open - i.gotOpen,
+});
+export const returned = (i: Item): Quantities => ({
+  closed: i.returnedClosed,
+  open: i.returnedOpen,
+});
+export const carried = (i: Item): Quantities => ({
+  closed: i.gotClosed - i.returnedClosed,
+  open: i.gotOpen - i.returnedOpen,
 });
 export const sum = (q: Quantities) => q.closed + q.open;
 export const clone = (d: Data): Data => JSON.parse(JSON.stringify(d));
@@ -78,6 +88,8 @@ export function add(d: Data, name: string, q: Quantities, note: string, merge: b
       note: note.trim(),
       gotClosed: 0,
       gotOpen: 0,
+      returnedClosed: 0,
+      returnedOpen: 0,
     });
   d.finishedAt = null;
 }
@@ -90,9 +102,24 @@ export function collect(d: Data, itemId: string, q: Quantities) {
   if (!i) throw new Error("Item não encontrado.");
   if (q.closed > i.closed || q.open > i.open)
     throw new Error("A coleta não pode ultrapassar o solicitado.");
+  if (q.closed < i.returnedClosed || q.open < i.returnedOpen)
+    throw new Error(
+      "A coleta não pode ficar abaixo dos fardos devolvidos. Corrija a devolução primeiro.",
+    );
   // Absolute totals: editing a collection must never add it again.
   i.gotClosed = q.closed;
   i.gotOpen = q.open;
+}
+export function returnToDepot(d: Data, itemId: string, q: Quantities) {
+  quantities(q, true);
+  const i = d.load.find((i) => i.id === itemId);
+  if (!i) throw new Error("Item não encontrado.");
+  if (q.closed > i.gotClosed || q.open > i.gotOpen)
+    throw new Error("Você só pode devolver fardos que já coletou.");
+  // Absolute returned totals prevent double-counting when correcting a return.
+  // Requested and collected totals stay intact: a return is never a new shortage.
+  i.returnedClosed = q.closed;
+  i.returnedOpen = q.open;
 }
 export function defer(d: Data, itemId: string) {
   const i = d.load.find((i) => i.id === itemId);
@@ -174,8 +201,9 @@ export function validate(raw: unknown): Data {
   };
   if (!raw || typeof raw !== "object") return fail();
   const d = raw as Data;
+  const legacy = (raw as { version?: number }).version === 1;
   if (
-    d.version !== 1 ||
+    (!legacy && d.version !== 2) ||
     !Number.isSafeInteger(d.revision) ||
     d.revision < 0 ||
     !Array.isArray(d.products) ||
@@ -229,10 +257,23 @@ export function validate(raw: unknown): Data {
         const a = i as Item;
         try {
           quantities({ closed: a.gotClosed, open: a.gotOpen }, true);
+          quantities(
+            {
+              closed: legacy ? (a.returnedClosed ?? 0) : a.returnedClosed,
+              open: legacy ? (a.returnedOpen ?? 0) : a.returnedOpen,
+            },
+            true,
+          );
         } catch {
           return fail();
         }
-        if (a.gotClosed > a.closed || a.gotOpen > a.open) return fail();
+        if (
+          a.gotClosed > a.closed ||
+          a.gotOpen > a.open ||
+          (a.returnedClosed ?? 0) > a.gotClosed ||
+          (a.returnedOpen ?? 0) > a.gotOpen
+        )
+          return fail();
       }
       itemIds.add(i.id);
       products.add(i.productId);
@@ -240,7 +281,7 @@ export function validate(raw: unknown): Data {
   }
   // Whitelist fields. Never persist arbitrary imported properties.
   return {
-    version: 1,
+    version: 2,
     revision: d.revision,
     finishedAt: d.finishedAt,
     products: d.products.map((p) => ({
@@ -256,6 +297,8 @@ export function validate(raw: unknown): Data {
       open: i.open,
       gotClosed: i.gotClosed,
       gotOpen: i.gotOpen,
+      returnedClosed: i.returnedClosed ?? 0,
+      returnedOpen: i.returnedOpen ?? 0,
       note: i.note,
     })),
     pending: d.pending.map((i) => ({
