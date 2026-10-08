@@ -61,6 +61,7 @@ const path = require("node:path");
     await page.getByRole("spinbutton", { name: "Fechados", exact: true }).fill(String(closed));
     await page.getByRole("spinbutton", { name: "Pra abrir", exact: true }).fill(String(open));
     await click("Salvar produto");
+    if (await page.getByRole("alertdialog").count()) await click("Confirmar");
 
     await page.getByRole("heading", { name: "Minha carga", exact: true }).waitFor();
   }
@@ -110,6 +111,7 @@ const path = require("node:path");
   d = await state();
   assert.equal(d.load[0].closed, 4);
   await click("Remover");
+  await click("Confirmar");
   await visible("Item removido.");
   assert.equal((await state()).load.length, 0);
   await click("Desfazer");
@@ -144,6 +146,7 @@ const path = require("node:path");
   assert.equal((await state()).load.length, 2);
   await click("Voltar para a lista");
   await page.getByRole("button", { name: "Remover", exact: true }).first().click();
+  await click("Confirmar");
   await visible("Item removido.");
   await click("Abrir menu");
   await page.locator("input[type=file]").setInputFiles({
@@ -192,6 +195,7 @@ const path = require("node:path");
   assert.equal(d.pending.length, 3);
   await click("Aguardando chegar 3");
   await page.getByRole("button", { name: "Remover", exact: true }).first().click();
+  await click("Confirmar");
   await visible("Item removido.");
   await click("Desfazer");
   await visible("Alteração desfeita.");
@@ -215,6 +219,7 @@ const path = require("node:path");
   assert.deepEqual(await state(), beforeFailure);
   assert.equal(await page.getByLabel("Nome do produto").inputValue(), "Falha de gravação");
   await click("Voltar");
+  await click("Confirmar");
   await click("Minha carga");
   assert.equal(
     await page.evaluate(

@@ -67,7 +67,6 @@ Variáveis opcionais: `APP_URL`, `CHROME_EXECUTABLE`, `CHROME_ARGS` (array JSON)
 - Viewports 320 e 360 px: sem rolagem horizontal. A navegação ocupa uma faixa própria e não cobre a lista. A viewport reduzida para 320 × 310 permitiu rolar até Salvar.
 - Não validado: Galaxy J7 físico, versão real do Chrome/Android, teclado virtual real, instalação Android e hospedagem publicada do Lovable. Os testes foram do build de produção servido localmente, não do editor/preview de desenvolvimento.
 
-
 ## Devolução de fardos e visual — 08/10/2026
 
 Em **Na carga**, use **Realocar no depósito** e confirme os totais de fardos que já foram fisicamente devolvidos. Os campos mantêm a separação entre fechados e os que seriam abertos. Só devolva fardos inteiros. O app não controla unidades soltas.
@@ -80,7 +79,6 @@ Visual: base azul, detalhes amarelos, saudação pessoal de teste “Olá, Pedro
 
 Verificação adicional: 11 testes unitários/roteamento passaram. `scripts/returns-browser-test.cjs` verificou em produção migração v1, devolução parcial/total, correção repetida, desfazer, transferência exclusiva do saldo real, restauração de backup v2, recarga offline, largura 320 px e redução de movimento. Continua pendente validar o J7 físico.
 
-
 ## Refinamento da interação e abertura — 08/10/2026
 
 A tela inicial usa caixas em SVG local, saudação compacta e estado vazio com **Montar minha carga**. O resumo apresenta saldo para buscar, fardos físicos coletados e quantos desses serão abertos. O progresso é `coletados / (coletados + saldo para buscar)`: não soma “pra abrir” novamente e exclui fardos devolvidos e saldos já transferidos para pendências. **Carga separada. Bora descer!** só aparece com uma carga física não vazia, sem saldo para buscar; não finaliza a reposição.
@@ -90,3 +88,27 @@ A logo abre em 780 ms, uma vez por sessão da aba (sessionStorage, com proteçã
 Os contadores mantêm o input nativo, aceitam toques rápidos usando atualização funcional e animam o número sem recriar o campo nem perder foco. Os ícones mostram no máximo quatro caixas por categoria e `+N`, em área de altura fixa. Atalhos 350 mL, 600 mL, 1 L e 2 L preenchem os campos existentes. Confirmações só aparecem após commit da transação; coleta parcial também permite desfazer. Nenhuma mudança no esquema de dados ou nas regras de devolução.
 
 Verificação: TypeScript, build e 12 testes unitários/roteamento passaram. `scripts/polish-browser-test.cjs` verificou abertura de sessão, CSS de animação indisponível, redução de movimento, 20 incrementos no mesmo ciclo de eventos, altura estável e ícones limitados, volumes, progresso, devoluções, pendências e funcionamento offline em 320/360 px. A suíte geral confirmou CRUD, falha de gravação, backup e encerramento/reinício do navegador offline. Teclado foi simulado reduzindo a viewport; desempenho e teclado do Galaxy J7 físico continuam não testados.
+
+### Aparência (claro, escuro e aparelho)
+
+Em **Menu → Aparência**, a troca é imediata e mantém o rascunho aberto. A opção
+inicial acompanha `prefers-color-scheme`, com claro como alternativa. Escolhas
+manuais prevalecem sobre o sistema. A preferência usa a chave local
+`meu-corredor-appearance`, separada do IndexedDB das anotações; os backups das
+cargas continuam no mesmo formato. Falhas ao salvar essa preferência aparecem
+no menu, sem impedir a troca para a sessão atual.
+
+Um script local no início do `<head>` aplica o tema antes da interface e da logo.
+As cores ficam em `src/theme.css`, incluindo SVGs, estados desabilitados e
+confirmações. `theme-color` e `color-scheme` acompanham a escolha; a tela de
+lançamento nativa do sistema pode continuar usando a cor estática do manifest,
+conforme o navegador. Nenhuma dependência ou migração de banco foi adicionada.
+O service worker inclui os novos arquivos automaticamente e mantém atualizações
+aguardando o fechamento das abas, sem limpar o IndexedDB.
+
+Verificação adicional: `scripts/theme-browser-test.cjs` contra build de produção
+confere tema do sistema/manual, tema antes da primeira interface, preservação de
+rascunhos e dados, confirmações, telas de 320/360 px, viewport reduzido para
+simular teclado, falta de suporte a matchMedia/falha de armazenamento e reinício
+completo do navegador offline mantendo a preferência. Teclado Android real,
+tela de lançamento nativa e desempenho no Galaxy J7 ainda exigem teste físico.

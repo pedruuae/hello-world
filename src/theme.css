@@ -1,0 +1,66 @@
+/* Shared colors for every app surface, control, message and local SVG. */
+:root {
+  color-scheme: light;
+  --bg: #f7f8fc;
+  --surface: #ffffff;
+  --muted-surface: #eef0f5;
+  --ink: #202a40;
+  --strong: #1d315c;
+  --muted: #596579;
+  --border: #d4dce9;
+  --input-border: #8391a8;
+  --primary: #2457d6;
+  --on-primary: #ffffff;
+  --blue-ink: #2852a9;
+  --blue-soft: #edf2ff;
+  --blue-chip: #dfe9ff;
+  --blue-border: #b9cbed;
+  --accent: #ffda59;
+  --on-accent: #1d315c;
+  --amber-ink: #725620;
+  --amber-soft: #fff7dc;
+  --amber-border: #dbcd9a;
+  --error-bg: #fff0eb;
+  --error-ink: #8c3023;
+  --error-border: #e7bdb1;
+  --focus: #b98213;
+  --disabled-bg: #e6eaf0;
+  --disabled-ink: #596579;
+  --box-blue: #3165db;
+  --box-blue-line: #edf3ff;
+  --box-yellow-line: #83641e;
+  --scrim: rgba(15, 23, 42, 0.45);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --muted-surface: #29364c;
+  --ink: #e7edf7;
+  --strong: #f0f4fc;
+  --muted: #b6c3d9;
+  --border: #46546b;
+  --input-border: #657791;
+  --primary: #3564cb;
+  --on-primary: #ffffff;
+  --blue-ink: #abc8ff;
+  --blue-soft: #192e50;
+  --blue-chip: #253f68;
+  --blue-border: #5275a5;
+  --accent: #f3cf65;
+  --on-accent: #1d315c;
+  --amber-ink: #f2d88d;
+  --amber-soft: #322c20;
+  --amber-border: #827047;
+  --error-bg: #3b242c;
+  --error-ink: #ffb9aa;
+  --error-border: #85534f;
+  --focus: #f3cf65;
+  --disabled-bg: #2b384f;
+  --disabled-ink: #aebbd0;
+  --box-blue: #6f98ee;
+  --box-blue-line: #152644;
+  --box-yellow-line: #5b4814;
+  --scrim: rgba(3, 8, 20, 0.72);
+}

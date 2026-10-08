@@ -1,3 +1,4 @@
+import { APPEARANCE_BOOTSTRAP } from "../features/corredor/appearance";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -83,7 +84,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { title: "Meu Corredor" },
       { name: "description", content: "Suas anotações de reposição, sempre à mão." },
-      { name: "theme-color", content: "#2457d6" },
       { property: "og:title", content: "Meu Corredor" },
       { property: "og:description", content: "Suas anotações de reposição, sempre à mão." },
       { property: "og:type", content: "website" },
@@ -107,8 +107,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <meta name="theme-color" content="#f7f8fc" suppressHydrationWarning />
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP }} />
         <HeadContent />
       </head>
       <body>

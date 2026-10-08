@@ -1,3 +1,5 @@
+import { useAppearance } from "./appearance";
+import { useConfirmation } from "./Confirmation";
 import { loadProgress } from "./progress";
 import { BoxStack, OpeningLogo, QuantityBoxes } from "./Polish";
 import { splitVolume, nameWithVolume, knownVolumeName, type VolumeUnit } from "./volume";
@@ -134,6 +136,8 @@ function Breakdown({ closed, open }: Quantities) {
   );
 }
 export default function App() {
+  const appearance = useAppearance();
+  const { ask, dialog, confirming } = useConfirmation();
   const [data, setData] = useState<Data>(emptyData);
   const [loaded, setLoaded] = useState(false),
     [busy, setBusy] = useState(false);
@@ -238,8 +242,8 @@ export default function App() {
     setError("");
     setNotice("");
   }
-  function closeEditor() {
-    if (window.confirm("Sair sem salvar esta anotação?")) {
+  async function closeEditor() {
+    if (await ask("Sair sem salvar esta anotação?")) {
       setEditor(null);
       setError("");
     }
@@ -306,7 +310,7 @@ export default function App() {
     if (v.kind === "add") {
       const p = data.products.find((p) => normalize(p.name) === normalize(v.name));
       if (p && data.load.some((i) => i.productId === p.id)) {
-        merge = window.confirm(
+        merge = await ask(
           "Este produto já está na carga. Somar os fardos informados ao item existente?",
         );
         if (!merge) return;
@@ -336,9 +340,9 @@ export default function App() {
   }
   async function remove(kind: "load" | "pending", i: Item | Pending) {
     if (
-      !window.confirm(
+      !(await ask(
         `Remover “${nameOf(i)}” ${kind === "load" ? "da carga" : "das pendências"}? As quantidades serão descartadas. Você poderá desfazer até a próxima alteração.`,
-      )
+      ))
     )
       return;
     await mutate(
@@ -458,883 +462,921 @@ export default function App() {
     );
   }
   return (
-    <div className="app-shell">
-      <OpeningLogo />
-      <header className="app-header">
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            if (!subscreen) setTab("load");
-          }}
-        >
-          <span className="brand-icon">
-            <Icon name="box" size={25} />
-          </span>
-          <span>Meu Corredor</span>
-        </a>
-        <button
-          className="menu-button"
-          disabled={busy || !!editor}
-          onClick={() => {
-            setMenu(!menu);
-            setFinishing(false);
-            setError("");
-          }}
-          aria-label={menu ? "Fechar menu" : "Abrir menu"}
-        >
-          <Icon name="menu" />
-          <span>Menu</span>
-        </button>
-      </header>
-      <div className={`offline-status ${offline.ready ? "ready" : ""}`} role="status">
-        <span className="status-dot" />
-        {offline.ready ? (
-          <span>
-            {offline.online
-              ? "Pronto para usar offline"
-              : "Sem internet · pronto para usar offline"}
-          </span>
-        ) : (
-          <span>{offline.status}</span>
-        )}
-      </div>
-      <main ref={main}>
-        {error && (
-          <div className="alert error" role="alert">
-            {error}
-          </div>
-        )}
-        {notice && !editor && (
-          <div className="alert success" role="status">
-            <span>{notice}</span>
-            {undo && (
+    <>
+      {dialog}
+      <div className="app-shell" aria-hidden={confirming ? true : undefined}>
+        <OpeningLogo />
+        <header className="app-header">
+          <a
+            className="brand"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              if (!subscreen) setTab("load");
+            }}
+          >
+            <span className="brand-icon">
+              <Icon name="box" size={25} />
+            </span>
+            <span>Meu Corredor</span>
+          </a>
+          <button
+            className="menu-button"
+            disabled={busy}
+            onClick={() => {
+              setMenu(!menu);
+              setFinishing(false);
+              setError("");
+            }}
+            aria-label={menu ? "Fechar menu" : "Abrir menu"}
+          >
+            <Icon name="menu" />
+            <span>Menu</span>
+          </button>
+        </header>
+        <div className={`offline-status ${offline.ready ? "ready" : ""}`} role="status">
+          <span className="status-dot" />
+          {offline.ready ? (
+            <span>
+              {offline.online
+                ? "Pronto para usar offline"
+                : "Sem internet · pronto para usar offline"}
+            </span>
+          ) : (
+            <span>{offline.status}</span>
+          )}
+        </div>
+        <main ref={main}>
+          {error && (
+            <div className="alert error" role="alert">
+              {error}
+            </div>
+          )}
+          {notice && !editor && (
+            <div className="alert success" role="status">
+              <span>{notice}</span>
+              {undo && (
+                <button
+                  disabled={busy}
+                  onClick={async () => {
+                    const u = undo;
+                    if (data.revision !== u.revision) {
+                      setError("A lista mudou. Não é possível desfazer com segurança.");
+                      setUndo(null);
+                      return;
+                    }
+                    await mutate(
+                      (d) => Object.assign(d, clone(u.data), { revision: d.revision }),
+                      "Alteração desfeita.",
+                    );
+                  }}
+                >
+                  Desfazer
+                </button>
+              )}
               <button
-                disabled={busy}
-                onClick={async () => {
-                  const u = undo;
-                  if (data.revision !== u.revision) {
-                    setError("A lista mudou. Não é possível desfazer com segurança.");
-                    setUndo(null);
-                    return;
-                  }
-                  await mutate(
-                    (d) => Object.assign(d, clone(u.data), { revision: d.revision }),
-                    "Alteração desfeita.",
-                  );
+                className="dismiss"
+                aria-label="Fechar aviso"
+                onClick={() => {
+                  setNotice("");
+                  setUndo(null);
                 }}
               >
-                Desfazer
+                ×
               </button>
-            )}
-            <button
-              className="dismiss"
-              aria-label="Fechar aviso"
-              onClick={() => {
-                setNotice("");
-                setUndo(null);
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-        {!loaded ? (
-          <section className="empty">
-            <Icon name="box" size={42} />
-            <h1>Abrindo suas anotações</h1>
-            <p>
-              {error
-                ? "Não faça novas anotações até o armazenamento estar disponível."
-                : "Carregando os dados deste aparelho…"}
-            </p>
-            {error && <button onClick={() => location.reload()}>Tentar novamente</button>}
-          </section>
-        ) : editor ? (
-          <section className="editor">
-            <button className="back-button" disabled={busy} onClick={closeEditor}>
-              <Icon name="back" />
-              Voltar
-            </button>
-            <h1 ref={heading} tabIndex={-1}>
-              {editor.kind === "add"
-                ? "Adicionar produto"
-                : editor.kind === "return"
-                  ? "Realocar no depósito"
+            </div>
+          )}
+          {!loaded ? (
+            <section className="empty">
+              <Icon name="box" size={42} />
+              <h1>Abrindo suas anotações</h1>
+              <p>
+                {error
+                  ? "Não faça novas anotações até o armazenamento estar disponível."
+                  : "Carregando os dados deste aparelho…"}
+              </p>
+              {error && <button onClick={() => location.reload()}>Tentar novamente</button>}
+            </section>
+          ) : editor && !menu ? (
+            <section className="editor">
+              <button className="back-button" disabled={busy} onClick={closeEditor}>
+                <Icon name="back" />
+                Voltar
+              </button>
+              <h1 ref={heading} tabIndex={-1}>
+                {editor.kind === "add"
+                  ? "Adicionar produto"
+                  : editor.kind === "return"
+                    ? "Realocar no depósito"
+                    : editor.kind === "collect"
+                      ? "Quanto você pegou?"
+                      : editor.kind === "rename"
+                        ? "Editar nome"
+                        : "Editar produto"}
+              </h1>
+              <p className="intro">
+                {editor.kind === "return"
+                  ? "Informe o total de fardos já devolvidos, incluindo devoluções anteriores. Confirme só depois de levá-los de volta ao depósito."
                   : editor.kind === "collect"
-                    ? "Quanto você pegou?"
+                    ? "Informe o total já coletado, incluindo o que pegou antes."
                     : editor.kind === "rename"
-                      ? "Editar nome"
-                      : "Editar produto"}
-            </h1>
-            <p className="intro">
-              {editor.kind === "return"
-                ? "Informe o total de fardos já devolvidos, incluindo devoluções anteriores. Confirme só depois de levá-los de volta ao depósito."
-                : editor.kind === "collect"
-                  ? "Informe o total já coletado, incluindo o que pegou antes."
-                  : editor.kind === "rename"
-                    ? "O novo nome será usado também na carga e nas pendências."
-                    : "Anote os fardos que você precisa buscar."}
-            </p>
-            <form onSubmit={save}>
-              <fieldset disabled={busy}>
-                {editor.kind === "collect" || editor.kind === "return" ? (
-                  <div className="form-product">
-                    <h2>{editor.name}</h2>
-                    <p>
-                      {editor.kind === "return" ? "Já coletado:" : "Solicitado:"} {editor.maxClosed}{" "}
-                      fechados · {editor.maxOpen} pra abrir
-                    </p>
-                  </div>
-                ) : (
-                  <label className="field-label">
-                    Nome do produto
-                    <input
-                      autoComplete="off"
-                      maxLength={120}
-                      required
-                      placeholder="Ex.: Coca-Cola, suco de uva…"
-                      value={editor.name}
-                      onChange={(e) => setEditor({ ...editor, name: e.target.value })}
-                    />
-                  </label>
-                )}
-                {editor.kind === "add" && editor.name.trim() && (
-                  <div className="suggestions">
-                    {data.products
-                      .filter(
-                        (p) =>
-                          normalize(p.name).includes(normalize(editor.name)) &&
-                          p.name !== editor.name,
-                      )
-                      .slice(0, 4)
-                      .map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setEditor({ ...editor, ...splitVolume(p.name) })}
-                        >
-                          {p.name}
-                        </button>
-                      ))}
-                  </div>
-                )}
-                {editor.kind !== "collect" && editor.kind !== "return" && (
-                  <div className="volume-field">
-                    <label className="field-label" htmlFor="product-volume">
-                      Volume da bebida <span className="optional">opcional</span>
-                    </label>
-                    <div className="volume-controls">
+                      ? "O novo nome será usado também na carga e nas pendências."
+                      : "Anote os fardos que você precisa buscar."}
+              </p>
+              <form onSubmit={save}>
+                <fieldset disabled={busy}>
+                  {editor.kind === "collect" || editor.kind === "return" ? (
+                    <div className="form-product">
+                      <h2>{editor.name}</h2>
+                      <p>
+                        {editor.kind === "return" ? "Já coletado:" : "Solicitado:"}{" "}
+                        {editor.maxClosed} fechados · {editor.maxOpen} pra abrir
+                      </p>
+                    </div>
+                  ) : (
+                    <label className="field-label">
+                      Nome do produto
                       <input
-                        id="product-volume"
-                        type="text"
-                        inputMode="decimal"
                         autoComplete="off"
-                        maxLength={9}
-                        placeholder={editor.unit === "mL" ? "Ex.: 350" : "Ex.: 1,5"}
-                        value={editor.volume}
-                        onChange={(e) => setEditor({ ...editor, volume: e.target.value })}
-                        aria-describedby="volume-hint"
+                        maxLength={120}
+                        required
+                        placeholder="Ex.: Coca-Cola, suco de uva…"
+                        value={editor.name}
+                        onChange={(e) => setEditor({ ...editor, name: e.target.value })}
                       />
-                      <div className="volume-units" role="group" aria-label="Unidade do volume">
-                        {(["mL", "L"] as const).map((unit) => (
+                    </label>
+                  )}
+                  {editor.kind === "add" && editor.name.trim() && (
+                    <div className="suggestions">
+                      {data.products
+                        .filter(
+                          (p) =>
+                            normalize(p.name).includes(normalize(editor.name)) &&
+                            p.name !== editor.name,
+                        )
+                        .slice(0, 4)
+                        .map((p) => (
                           <button
-                            key={unit}
+                            key={p.id}
                             type="button"
-                            aria-pressed={editor.unit === unit}
-                            className={editor.unit === unit ? "selected" : ""}
-                            onClick={() => setEditor({ ...editor, unit })}
+                            onClick={() => setEditor({ ...editor, ...splitVolume(p.name) })}
                           >
-                            {unit}
+                            {p.name}
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                  {editor.kind !== "collect" && editor.kind !== "return" && (
+                    <div className="volume-field">
+                      <label className="field-label" htmlFor="product-volume">
+                        Volume da bebida <span className="optional">opcional</span>
+                      </label>
+                      <div className="volume-controls">
+                        <input
+                          id="product-volume"
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          maxLength={9}
+                          placeholder={editor.unit === "mL" ? "Ex.: 350" : "Ex.: 1,5"}
+                          value={editor.volume}
+                          onChange={(e) => setEditor({ ...editor, volume: e.target.value })}
+                          aria-describedby="volume-hint"
+                        />
+                        <div className="volume-units" role="group" aria-label="Unidade do volume">
+                          {(["mL", "L"] as const).map((unit) => (
+                            <button
+                              key={unit}
+                              type="button"
+                              aria-pressed={editor.unit === unit}
+                              className={editor.unit === unit ? "selected" : ""}
+                              onClick={() => setEditor({ ...editor, unit })}
+                            >
+                              {unit}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="volume-presets" role="group" aria-label="Volumes rápidos">
+                        {(
+                          [
+                            { volume: "350", unit: "mL" },
+                            { volume: "600", unit: "mL" },
+                            { volume: "1", unit: "L" },
+                            { volume: "2", unit: "L" },
+                          ] as const
+                        ).map((preset) => (
+                          <button
+                            key={preset.volume + preset.unit}
+                            type="button"
+                            aria-pressed={
+                              Number(editor.volume.replace(",", ".")) === Number(preset.volume) &&
+                              editor.unit === preset.unit
+                            }
+                            onClick={() =>
+                              setEditor((current) =>
+                                current ? { ...current, ...preset } : current,
+                              )
+                            }
+                          >
+                            {preset.volume} {preset.unit}
                           </button>
                         ))}
                       </div>
+                      <p id="volume-hint" className="hint">
+                        Volume de cada garrafa ou lata. A carga continua sendo contada em fardos.
+                      </p>
                     </div>
-                    <div className="volume-presets" role="group" aria-label="Volumes rápidos">
-                      {(
-                        [
-                          { volume: "350", unit: "mL" },
-                          { volume: "600", unit: "mL" },
-                          { volume: "1", unit: "L" },
-                          { volume: "2", unit: "L" },
-                        ] as const
-                      ).map((preset) => (
-                        <button
-                          key={preset.volume + preset.unit}
-                          type="button"
-                          aria-pressed={
-                            Number(editor.volume.replace(",", ".")) === Number(preset.volume) &&
-                            editor.unit === preset.unit
+                  )}
+                  {editor.kind !== "rename" && (
+                    <>
+                      <div className="quantities">
+                        <Counter
+                          label="Fechados"
+                          value={editor.closed}
+                          {...(editor.maxClosed !== undefined ? { max: editor.maxClosed } : {})}
+                          onChange={(closed) =>
+                            setEditor((current) => (current ? { ...current, closed } : current))
                           }
-                          onClick={() =>
-                            setEditor((current) => (current ? { ...current, ...preset } : current))
+                          onStep={(delta) => stepQuantity("closed", delta)}
+                        />
+                        <Counter
+                          label="Pra abrir"
+                          value={editor.open}
+                          {...(editor.maxOpen !== undefined ? { max: editor.maxOpen } : {})}
+                          onChange={(open) =>
+                            setEditor((current) => (current ? { ...current, open } : current))
                           }
-                        >
-                          {preset.volume} {preset.unit}
-                        </button>
-                      ))}
-                    </div>
-                    <p id="volume-hint" className="hint">
-                      Volume de cada garrafa ou lata. A carga continua sendo contada em fardos.
+                          onStep={(delta) => stepQuantity("open", delta)}
+                        />
+                      </div>
+                      <QuantityBoxes closed={editor.closed} open={editor.open} />
+                      <p className="hint">
+                        {editor.kind === "return"
+                          ? "Devolva somente fardos inteiros. As categorias indicam como você pretendia repor."
+                          : "“Pra abrir” conta fardos, não unidades. Abra na área de vendas."}
+                      </p>
+                      <div className="form-total">
+                        <span>
+                          {editor.kind === "return"
+                            ? "Total devolvido"
+                            : editor.kind === "collect"
+                              ? "Total coletado"
+                              : "Total para buscar"}
+                        </span>
+                        <strong>{(editor.closed || 0) + (editor.open || 0)} fardos</strong>
+                      </div>
+                      {editor.kind === "collect" || editor.kind === "return" ? (
+                        <p className="hint">
+                          {editor.kind === "return" ? "Fica na carga:" : "Restante:"}{" "}
+                          {Math.max(0, (editor.maxClosed || 0) - (editor.closed || 0))} fechados ·{" "}
+                          {Math.max(0, (editor.maxOpen || 0) - (editor.open || 0))} pra abrir
+                        </p>
+                      ) : (
+                        <label className="field-label">
+                          Observação <span className="optional">opcional</span>
+                          <textarea
+                            rows={3}
+                            maxLength={500}
+                            placeholder="Ex.: pegar o que vence primeiro"
+                            value={editor.note}
+                            onChange={(e) => setEditor({ ...editor, note: e.target.value })}
+                          />
+                        </label>
+                      )}
+                    </>
+                  )}
+                  <button className="primary full" type="submit">
+                    {busy
+                      ? "Salvando…"
+                      : editor.kind === "return"
+                        ? "Confirmar devolução"
+                        : editor.kind === "collect"
+                          ? "Salvar coleta"
+                          : editor.kind === "add"
+                            ? `Adicionar ${editorTotal} ${editorTotal === 1 ? "fardo" : "fardos"} à carga`
+                            : "Salvar alterações"}
+                  </button>
+                </fieldset>
+              </form>
+            </section>
+          ) : menu ? (
+            <section className="settings">
+              <button className="back-button" onClick={() => setMenu(false)}>
+                <Icon name="back" />
+                {editor ? "Voltar à anotação" : "Voltar para a lista"}
+              </button>
+              <h1 ref={heading} tabIndex={-1}>
+                Seu app, seus dados.
+              </h1>
+              <p className="intro">Tudo fica neste navegador, neste aparelho.</p>
+              {offline.update && (
+                <div className="alert">
+                  Uma atualização está pronta. Salve suas anotações e feche todas as abas do app
+                  para aplicá-la. Não é preciso apagar os dados.
+                </div>
+              )}
+              <section className="settings-section appearance-section">
+                <h2>Aparência</h2>
+                <div className="appearance-options" role="group" aria-label="Aparência">
+                  {(
+                    [
+                      { value: "light", label: "Claro", icon: "sun" },
+                      { value: "dark", label: "Escuro", icon: "moon" },
+                      { value: "system", label: "Usar tema do aparelho", icon: "device" },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={appearance.preference === option.value}
+                      onClick={() => appearance.choose(option.value)}
+                    >
+                      <Icon name={option.icon} size={20} />
+                      {option.label}
+                      {appearance.preference === option.value && <Icon name="check" size={17} />}
+                    </button>
+                  ))}
+                </div>
+                {appearance.warning && (
+                  <p className="alert error" role="alert">
+                    {appearance.warning}
+                  </p>
+                )}
+              </section>
+              <section className="settings-section">
+                <h2>Backup das anotações</h2>
+                <p>
+                  Limpar os dados do navegador, perder o aparelho ou a remoção automática de
+                  armazenamento pode apagar suas listas. Guarde um backup de vez em quando.
+                </p>
+                <button className="secondary full" onClick={exportBackup}>
+                  <Icon name="down" />
+                  Exportar backup JSON
+                </button>
+                <button className="secondary full" onClick={() => file.current?.click()}>
+                  <Icon name="up" />
+                  Importar backup
+                </button>
+                <input
+                  ref={file}
+                  className="file-input"
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(e) => importFile(e.target.files?.[0])}
+                />
+                {imported && (
+                  <div className="import-confirm">
+                    <h3>Substituir os dados atuais?</h3>
+                    <p>
+                      O arquivo tem {imported.products.length} produtos, {imported.load.length}{" "}
+                      itens na carga e {imported.pending.length} pendências. As listas atuais serão
+                      substituídas. Exporte-as antes, se precisar.
                     </p>
+                    <button
+                      disabled={busy}
+                      className="primary full"
+                      onClick={async () => {
+                        const value = clone(imported);
+                        if (
+                          await mutate(
+                            (d) => Object.assign(d, value, { revision: d.revision }),
+                            "Backup restaurado.",
+                          )
+                        )
+                          setImported(null);
+                      }}
+                    >
+                      Confirmar substituição
+                    </button>
+                    <button className="full" onClick={() => setImported(null)}>
+                      Cancelar importação
+                    </button>
                   </div>
                 )}
-                {editor.kind !== "rename" && (
-                  <>
-                    <div className="quantities">
-                      <Counter
-                        label="Fechados"
-                        value={editor.closed}
-                        {...(editor.maxClosed !== undefined ? { max: editor.maxClosed } : {})}
-                        onChange={(closed) =>
-                          setEditor((current) => (current ? { ...current, closed } : current))
-                        }
-                        onStep={(delta) => stepQuantity("closed", delta)}
-                      />
-                      <Counter
-                        label="Pra abrir"
-                        value={editor.open}
-                        {...(editor.maxOpen !== undefined ? { max: editor.maxOpen } : {})}
-                        onChange={(open) =>
-                          setEditor((current) => (current ? { ...current, open } : current))
-                        }
-                        onStep={(delta) => stepQuantity("open", delta)}
-                      />
-                    </div>
-                    <QuantityBoxes closed={editor.closed} open={editor.open} />
-                    <p className="hint">
-                      {editor.kind === "return"
-                        ? "Devolva somente fardos inteiros. As categorias indicam como você pretendia repor."
-                        : "“Pra abrir” conta fardos, não unidades. Abra na área de vendas."}
-                    </p>
-                    <div className="form-total">
-                      <span>
-                        {editor.kind === "return"
-                          ? "Total devolvido"
-                          : editor.kind === "collect"
-                            ? "Total coletado"
-                            : "Total para buscar"}
-                      </span>
-                      <strong>{(editor.closed || 0) + (editor.open || 0)} fardos</strong>
-                    </div>
-                    {editor.kind === "collect" || editor.kind === "return" ? (
-                      <p className="hint">
-                        {editor.kind === "return" ? "Fica na carga:" : "Restante:"}{" "}
-                        {Math.max(0, (editor.maxClosed || 0) - (editor.closed || 0))} fechados ·{" "}
-                        {Math.max(0, (editor.maxOpen || 0) - (editor.open || 0))} pra abrir
-                      </p>
-                    ) : (
-                      <label className="field-label">
-                        Observação <span className="optional">opcional</span>
-                        <textarea
-                          rows={3}
-                          maxLength={500}
-                          placeholder="Ex.: pegar o que vence primeiro"
-                          value={editor.note}
-                          onChange={(e) => setEditor({ ...editor, note: e.target.value })}
-                        />
-                      </label>
-                    )}
-                  </>
-                )}
-                <button className="primary full" type="submit">
-                  {busy
-                    ? "Salvando…"
-                    : editor.kind === "return"
-                      ? "Confirmar devolução"
-                      : editor.kind === "collect"
-                        ? "Salvar coleta"
-                        : editor.kind === "add"
-                          ? `Adicionar ${editorTotal} ${editorTotal === 1 ? "fardo" : "fardos"} à carga`
-                          : "Salvar alterações"}
-                </button>
-              </fieldset>
-            </form>
-          </section>
-        ) : menu ? (
-          <section className="settings">
-            <button className="back-button" onClick={() => setMenu(false)}>
-              <Icon name="back" />
-              Voltar para a lista
-            </button>
-            <h1 ref={heading} tabIndex={-1}>
-              Seu app, seus dados.
-            </h1>
-            <p className="intro">Tudo fica neste navegador, neste aparelho.</p>
-            {offline.update && (
-              <div className="alert">
-                Uma atualização está pronta. Salve suas anotações e feche todas as abas do app para
-                aplicá-la. Não é preciso apagar os dados.
-              </div>
-            )}
-            <section className="settings-section">
-              <h2>Backup das anotações</h2>
-              <p>
-                Limpar os dados do navegador, perder o aparelho ou a remoção automática de
-                armazenamento pode apagar suas listas. Guarde um backup de vez em quando.
-              </p>
-              <button className="secondary full" onClick={exportBackup}>
-                <Icon name="down" />
-                Exportar backup JSON
-              </button>
-              <button className="secondary full" onClick={() => file.current?.click()}>
-                <Icon name="up" />
-                Importar backup
-              </button>
-              <input
-                ref={file}
-                className="file-input"
-                type="file"
-                accept=".json,application/json"
-                onChange={(e) => importFile(e.target.files?.[0])}
-              />
-              {imported && (
-                <div className="import-confirm">
-                  <h3>Substituir os dados atuais?</h3>
-                  <p>
-                    O arquivo tem {imported.products.length} produtos, {imported.load.length} itens
-                    na carga e {imported.pending.length} pendências. As listas atuais serão
-                    substituídas. Exporte-as antes, se precisar.
-                  </p>
+              </section>
+              <section className="settings-section">
+                <h2>Instalar no celular</h2>
+                <p>
+                  No Chrome, abra o menu ⋮ e escolha “Instalar app” ou “Adicionar à tela inicial”. O
+                  nome da opção depende do navegador.
+                </p>
+                {install && (
                   <button
-                    disabled={busy}
                     className="primary full"
                     onClick={async () => {
-                      const value = clone(imported);
-                      if (
-                        await mutate(
-                          (d) => Object.assign(d, value, { revision: d.revision }),
-                          "Backup restaurado.",
-                        )
-                      )
-                        setImported(null);
+                      try {
+                        await install.prompt();
+                        await install.userChoice;
+                        setInstall(null);
+                      } catch {
+                        setNotice("Use o menu do navegador para instalar.");
+                      }
                     }}
                   >
-                    Confirmar substituição
+                    Instalar Meu Corredor
                   </button>
-                  <button className="full" onClick={() => setImported(null)}>
-                    Cancelar importação
-                  </button>
-                </div>
-              )}
-            </section>
-            <section className="settings-section">
-              <h2>Instalar no celular</h2>
-              <p>
-                No Chrome, abra o menu ⋮ e escolha “Instalar app” ou “Adicionar à tela inicial”. O
-                nome da opção depende do navegador.
-              </p>
-              {install && (
-                <button
-                  className="primary full"
-                  onClick={async () => {
-                    try {
-                      await install.prompt();
-                      await install.userChoice;
-                      setInstall(null);
-                    } catch {
-                      setNotice("Use o menu do navegador para instalar.");
-                    }
-                  }}
-                >
-                  Instalar Meu Corredor
-                </button>
-              )}
-              <p>
-                Abra com internet e aguarde “Pronto para usar offline” antes de ir ao trabalho.
-                Depois, teste fechando e reabrindo em modo avião.
-              </p>
-            </section>
-            <section className="settings-section">
-              <h2>Armazenamento e compatibilidade</h2>
-              <button
-                className="secondary full"
-                onClick={async () => setPersistence(await requestPersistence())}
-              >
-                Pedir proteção de armazenamento
-              </button>
-              {persistence && <p role="status">{persistence}</p>}
-              <p>
-                A proteção depende do navegador e não substitui o backup. O app também pede essa
-                proteção após o primeiro salvamento.
-              </p>
-              <p>
-                Use Chrome 90 ou mais recente como base de compatibilidade. É necessário JavaScript,
-                IndexedDB e, para offline, HTTPS, Cache Storage e service worker. Não há garantia
-                para todo Galaxy J7: depende da versão do Android e do navegador. Instalação e
-                teclado precisam ser conferidos no seu aparelho.
-              </p>
-              <p className="muted">Sem conta. Sem fotos. Sem conexão para suas listas.</p>
-            </section>
-          </section>
-        ) : finishing ? (
-          <section className="finish-screen">
-            <button className="back-button" onClick={() => setFinishing(false)}>
-              <Icon name="back" />
-              Continuar a carga
-            </button>
-            <div className="empty-icon">
-              <Icon name="check" size={32} />
-            </div>
-            <h1 ref={heading} tabIndex={-1}>
-              Concluir esta carga?
-            </h1>
-            <p className="intro">
-              Finalize depois de repor os produtos ou devolver os fardos que sobraram. Pegar no
-              depósito ainda não é repor.
-            </p>
-            <div className="summary-line">
-              <span>Fardos da carga para repor</span>
-              <strong>{got} fardos</strong>
-            </div>
-            {backInDepot > 0 && (
-              <div className="summary-line">
-                <span>Devolvidos ao depósito</span>
-                <strong>{backInDepot} fardos</strong>
-              </div>
-            )}
-            {left > 0 && (
-              <div className="alert">
-                Ainda faltam <strong>{left} fardos</strong>. Ao finalizar, somente esse saldo irá
-                para “Aguardando chegar”.
-              </div>
-            )}
-            <p>
-              Os itens desta carga serão encerrados. Seus produtos e pendências continuam salvos.
-            </p>
-            <button
-              className="primary full"
-              disabled={busy}
-              onClick={async () => {
-                if (await mutate((d) => finish(d, true), "Carga finalizada. Boa reposição!", true))
-                  setFinishing(false);
-              }}
-            >
-              {left ? "Mover saldo e finalizar" : "Confirmar finalização"}
-            </button>
-            <button className="secondary full" onClick={() => setFinishing(false)}>
-              Continuar a carga
-            </button>
-          </section>
-        ) : (
-          <>
-            {tab === "load" && (
-              <section className="welcome">
-                <div>
-                  <h2>Olá, Pedro Daniel!</h2>
-                  <p>O que vamos repor hoje?</p>
-                </div>
-                <BoxStack />
+                )}
+                <p>
+                  Abra com internet e aguarde “Pronto para usar offline” antes de ir ao trabalho.
+                  Depois, teste fechando e reabrindo em modo avião.
+                </p>
               </section>
-            )}
-            <div className="page-heading">
-              <div>
-                <h1 ref={heading} tabIndex={-1}>
-                  {tab === "load"
-                    ? "Minha carga"
-                    : tab === "pending"
-                      ? "Aguardando chegar"
-                      : "Meus produtos"}
-                </h1>
+              <section className="settings-section">
+                <h2>Armazenamento e compatibilidade</h2>
+                <button
+                  className="secondary full"
+                  onClick={async () => setPersistence(await requestPersistence())}
+                >
+                  Pedir proteção de armazenamento
+                </button>
+                {persistence && <p role="status">{persistence}</p>}
+                <p>
+                  A proteção depende do navegador e não substitui o backup. O app também pede essa
+                  proteção após o primeiro salvamento.
+                </p>
+                <p>
+                  Use Chrome 90 ou mais recente como base de compatibilidade. É necessário
+                  JavaScript, IndexedDB e, para offline, HTTPS, Cache Storage e service worker. Não
+                  há garantia para todo Galaxy J7: depende da versão do Android e do navegador.
+                  Instalação e teclado precisam ser conferidos no seu aparelho.
+                </p>
+                <p className="muted">Sem conta. Sem fotos. Sem conexão para suas listas.</p>
+              </section>
+            </section>
+          ) : finishing ? (
+            <section className="finish-screen">
+              <button className="back-button" onClick={() => setFinishing(false)}>
+                <Icon name="back" />
+                Continuar a carga
+              </button>
+              <div className="empty-icon">
+                <Icon name="check" size={32} />
               </div>
-              <span className="page-symbol">
-                <Icon
-                  name={tab === "load" ? "box" : tab === "pending" ? "clock" : "list"}
-                  size={28}
-                />
-              </span>
-            </div>
-            {tab === "load" ? (
-              <>
-                {data.load.length > 0 ? (
-                  <>
-                    {progress.total > 0 && (
-                      <section className="load-overview" aria-label="Resumo da carga atual">
-                        <div className="load-summary">
-                          <div>
-                            <strong key={progress.left} className="metric-value">
-                              {progress.left}
-                            </strong>
-                            <span>Para buscar</span>
-                          </div>
-                          <div>
-                            <strong key={progress.collected} className="metric-value">
-                              {progress.collected}
-                            </strong>
-                            <span>Coletados</span>
-                          </div>
-                          <div className="open-metric">
-                            <strong key={progress.toOpen} className="metric-value">
-                              {progress.toOpen}
-                            </strong>
-                            <span>Pra abrir</span>
-                          </div>
-                        </div>
-                        <p className="summary-note">Pra abrir já está incluído nos coletados.</p>
-                        <div className="progress-label">
-                          <span>
-                            {progress.collected} de {progress.total} fardos coletados
-                          </span>
-                          <Icon name={progress.complete ? "check" : "box"} size={16} />
-                        </div>
-                        <div
-                          className="load-progress"
-                          role="progressbar"
-                          aria-label="Fardos coletados nesta carga"
-                          aria-valuemin={0}
-                          aria-valuemax={progress.total}
-                          aria-valuenow={progress.collected}
-                        >
-                          <span style={{ transform: `scaleX(${progress.percent / 100})` }} />
-                        </div>
-                        {progress.complete && (
-                          <p className="load-ready" role="status">
-                            <Icon name="check" size={18} />
-                            Carga separada. Bora descer!
-                          </p>
-                        )}
-                      </section>
-                    )}
-                    <section className="list-section">
-                      <div className="section-heading">
-                        <h2>Para buscar</h2>
-                        <span>
-                          {toGet.length} {toGet.length === 1 ? "produto" : "produtos"}
-                        </span>
-                      </div>
-                      {toGet.length === 0 ? (
-                        <p className="inline-empty">
-                          <Icon name="check" />
-                          {got > 0
-                            ? "Abra na área de vendas os fardos indicados abaixo."
-                            : "Nenhum fardo para buscar. Confira as devoluções abaixo."}
-                        </p>
-                      ) : (
-                        toGet.map((i) => (
-                          <article className="item-card" key={i.id}>
-                            <div className="item-top">
-                              <h3>{nameOf(i)}</h3>
-                              <span className="tag">
-                                {i.gotClosed + i.gotOpen ? "Parcial" : "A buscar"}
-                              </span>
+              <h1 ref={heading} tabIndex={-1}>
+                Concluir esta carga?
+              </h1>
+              <p className="intro">
+                Finalize depois de repor os produtos ou devolver os fardos que sobraram. Pegar no
+                depósito ainda não é repor.
+              </p>
+              <div className="summary-line">
+                <span>Fardos da carga para repor</span>
+                <strong>{got} fardos</strong>
+              </div>
+              {backInDepot > 0 && (
+                <div className="summary-line">
+                  <span>Devolvidos ao depósito</span>
+                  <strong>{backInDepot} fardos</strong>
+                </div>
+              )}
+              {left > 0 && (
+                <div className="alert">
+                  Ainda faltam <strong>{left} fardos</strong>. Ao finalizar, somente esse saldo irá
+                  para “Aguardando chegar”.
+                </div>
+              )}
+              <p>
+                Os itens desta carga serão encerrados. Seus produtos e pendências continuam salvos.
+              </p>
+              <button
+                className="primary full"
+                disabled={busy}
+                onClick={async () => {
+                  if (
+                    await mutate((d) => finish(d, true), "Carga finalizada. Boa reposição!", true)
+                  )
+                    setFinishing(false);
+                }}
+              >
+                {left ? "Mover saldo e finalizar" : "Confirmar finalização"}
+              </button>
+              <button className="secondary full" onClick={() => setFinishing(false)}>
+                Continuar a carga
+              </button>
+            </section>
+          ) : (
+            <>
+              {tab === "load" && (
+                <section className="welcome">
+                  <div>
+                    <h2>Olá, Pedro Daniel!</h2>
+                    <p>O que vamos repor hoje?</p>
+                  </div>
+                  <BoxStack />
+                </section>
+              )}
+              <div className="page-heading">
+                <div>
+                  <h1 ref={heading} tabIndex={-1}>
+                    {tab === "load"
+                      ? "Minha carga"
+                      : tab === "pending"
+                        ? "Aguardando chegar"
+                        : "Meus produtos"}
+                  </h1>
+                </div>
+                <span className="page-symbol">
+                  <Icon
+                    name={tab === "load" ? "box" : tab === "pending" ? "clock" : "list"}
+                    size={28}
+                  />
+                </span>
+              </div>
+              {tab === "load" ? (
+                <>
+                  {data.load.length > 0 ? (
+                    <>
+                      {progress.total > 0 && (
+                        <section className="load-overview" aria-label="Resumo da carga atual">
+                          <div className="load-summary">
+                            <div>
+                              <strong key={progress.left} className="metric-value">
+                                {progress.left}
+                              </strong>
+                              <span>Para buscar</span>
                             </div>
-                            <p className="item-total">
-                              Buscar: <strong>{sum(remaining(i))} fardos</strong>
+                            <div>
+                              <strong key={progress.collected} className="metric-value">
+                                {progress.collected}
+                              </strong>
+                              <span>Coletados</span>
+                            </div>
+                            <div className="open-metric">
+                              <strong key={progress.toOpen} className="metric-value">
+                                {progress.toOpen}
+                              </strong>
+                              <span>Pra abrir</span>
+                            </div>
+                          </div>
+                          <p className="summary-note">Pra abrir já está incluído nos coletados.</p>
+                          <div className="progress-label">
+                            <span>
+                              {progress.collected} de {progress.total} fardos coletados
+                            </span>
+                            <Icon name={progress.complete ? "check" : "box"} size={16} />
+                          </div>
+                          <div
+                            className="load-progress"
+                            role="progressbar"
+                            aria-label="Fardos coletados nesta carga"
+                            aria-valuemin={0}
+                            aria-valuemax={progress.total}
+                            aria-valuenow={progress.collected}
+                          >
+                            <span style={{ transform: `scaleX(${progress.percent / 100})` }} />
+                          </div>
+                          {progress.complete && (
+                            <p className="load-ready" role="status">
+                              <Icon name="check" size={18} />
+                              Carga separada. Bora descer!
                             </p>
-                            <Breakdown {...remaining(i)} />
-                            {i.gotClosed + i.gotOpen > 0 && (
-                              <p className="collected-note">
-                                Na carga: {carried(i).closed} fechados · {carried(i).open} pra abrir
-                                {sum(returned(i)) > 0 && <> · {sum(returned(i))} devolvidos</>}
-                              </p>
-                            )}
-                            {i.note && <p className="note">{i.note}</p>}
-                            <div className="item-actions">
-                              <button
-                                className="primary"
-                                disabled={busy}
-                                onClick={() =>
-                                  mutate((d) => collect(d, i.id, i), "Fardos coletados.", true)
-                                }
-                              >
-                                <Icon name="check" size={18} />
-                                Peguei tudo
-                              </button>
-                              <button className="secondary" onClick={() => editCollection(i)}>
-                                Peguei parte
-                              </button>
-                            </div>
-                            <button
-                              className="wait-button"
-                              disabled={busy}
-                              onClick={() =>
-                                mutate(
-                                  (d) => defer(d, i.id),
-                                  "Somente o saldo foi para Aguardando chegar.",
-                                  true,
-                                )
-                              }
-                            >
-                              <Icon name="clock" size={18} />
-                              {i.gotClosed + i.gotOpen ? "Aguardar restante" : "Não tem · aguardar"}
-                            </button>
-                            <div className="item-tools">
-                              <button onClick={() => edit(i, "load")}>Editar</button>
-                              <button onClick={() => remove("load", i)}>Remover</button>
-                            </div>
-                          </article>
-                        ))
+                          )}
+                        </section>
                       )}
-                    </section>
-                    <section className="list-section">
-                      <div className="section-heading">
-                        <h2>Na carga</h2>
-                        <span>
-                          {inLoad.length} {inLoad.length === 1 ? "produto" : "produtos"}
-                        </span>
-                      </div>
-                      <p className="section-help">
-                        Você já pegou. Abra os fardos indicados ao descer.
-                      </p>
-                      {inLoad.length === 0 ? (
-                        <p className="inline-empty">
-                          {backInDepot > 0
-                            ? "Os fardos coletados já foram devolvidos ao depósito."
-                            : "Os produtos coletados aparecerão aqui."}
-                        </p>
-                      ) : (
-                        inLoad.map((i) => (
-                          <article className="item-card collected" key={i.id}>
-                            <div className="item-top">
-                              <h3>{nameOf(i)}</h3>
-                              <span className="tag">
-                                <Icon name="check" size={14} />
-                                Coletado
-                              </span>
-                            </div>
-                            <p className="item-total">
-                              <strong>{sum(carried(i))} fardos</strong> na carga
-                            </p>
-                            <Breakdown {...carried(i)} />
-                            {carried(i).open > 0 && (
-                              <p className="opening-note">
-                                Abrir {carried(i).open} {carried(i).open === 1 ? "fardo" : "fardos"}{" "}
-                                na área de vendas
+                      <section className="list-section">
+                        <div className="section-heading">
+                          <h2>Para buscar</h2>
+                          <span>
+                            {toGet.length} {toGet.length === 1 ? "produto" : "produtos"}
+                          </span>
+                        </div>
+                        {toGet.length === 0 ? (
+                          <p className="inline-empty">
+                            <Icon name="check" />
+                            {got > 0
+                              ? "Abra na área de vendas os fardos indicados abaixo."
+                              : "Nenhum fardo para buscar. Confira as devoluções abaixo."}
+                          </p>
+                        ) : (
+                          toGet.map((i) => (
+                            <article className="item-card" key={i.id}>
+                              <div className="item-top">
+                                <h3>{nameOf(i)}</h3>
+                                <span className="tag">
+                                  {i.gotClosed + i.gotOpen ? "Parcial" : "A buscar"}
+                                </span>
+                              </div>
+                              <p className="item-total">
+                                Buscar: <strong>{sum(remaining(i))} fardos</strong>
                               </p>
-                            )}
-                            {sum(remaining(i)) > 0 && (
-                              <p className="muted">
-                                Ainda falta buscar: {sum(remaining(i))} fardos.
-                              </p>
-                            )}
-                            {i.note && <p className="note">{i.note}</p>}
-                            <button
-                              className="secondary full return-button"
-                              disabled={busy}
-                              onClick={() => editReturn(i)}
-                            >
-                              <Icon name="return" size={18} />
-                              Realocar no depósito
-                            </button>
-                            <div className="item-tools">
-                              <button onClick={() => editCollection(i)}>Corrigir coleta</button>
+                              <Breakdown {...remaining(i)} />
+                              {i.gotClosed + i.gotOpen > 0 && (
+                                <p className="collected-note">
+                                  Na carga: {carried(i).closed} fechados · {carried(i).open} pra
+                                  abrir
+                                  {sum(returned(i)) > 0 && <> · {sum(returned(i))} devolvidos</>}
+                                </p>
+                              )}
+                              {i.note && <p className="note">{i.note}</p>}
+                              <div className="item-actions">
+                                <button
+                                  className="primary"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    mutate((d) => collect(d, i.id, i), "Fardos coletados.", true)
+                                  }
+                                >
+                                  <Icon name="check" size={18} />
+                                  Peguei tudo
+                                </button>
+                                <button className="secondary" onClick={() => editCollection(i)}>
+                                  Peguei parte
+                                </button>
+                              </div>
                               <button
+                                className="wait-button"
                                 disabled={busy}
                                 onClick={() =>
                                   mutate(
-                                    (d) => collect(d, i.id, { closed: 0, open: 0 }),
-                                    "Coleta desfeita. O item voltou para buscar.",
+                                    (d) => defer(d, i.id),
+                                    "Somente o saldo foi para Aguardando chegar.",
                                     true,
                                   )
                                 }
                               >
-                                Desfazer coleta
+                                <Icon name="clock" size={18} />
+                                {i.gotClosed + i.gotOpen
+                                  ? "Aguardar restante"
+                                  : "Não tem · aguardar"}
                               </button>
-                              <button onClick={() => edit(i, "load")}>Editar</button>
-                              <button onClick={() => remove("load", i)}>Remover</button>
-                            </div>
-                          </article>
-                        ))
-                      )}
-                    </section>
-                    {inDepot.length > 0 && (
-                      <section className="list-section returned-section">
+                              <div className="item-tools">
+                                <button onClick={() => edit(i, "load")}>Editar</button>
+                                <button onClick={() => remove("load", i)}>Remover</button>
+                              </div>
+                            </article>
+                          ))
+                        )}
+                      </section>
+                      <section className="list-section">
                         <div className="section-heading">
-                          <h2>Devolvidos ao depósito</h2>
-                          <span>{backInDepot} fardos</span>
+                          <h2>Na carga</h2>
+                          <span>
+                            {inLoad.length} {inLoad.length === 1 ? "produto" : "produtos"}
+                          </span>
                         </div>
                         <p className="section-help">
-                          Já voltaram. Não estão na carga nem nas pendências.
+                          Você já pegou. Abra os fardos indicados ao descer.
                         </p>
-                        {inDepot.map((i) => (
-                          <article className="item-card returned" key={i.id}>
-                            <div className="item-top">
-                              <h3>{nameOf(i)}</h3>
-                              <span className="tag">
-                                <Icon name="return" size={14} />
-                                Devolvido
-                              </span>
-                            </div>
-                            <Breakdown {...returned(i)} />
-                            <button
-                              className="secondary full"
-                              disabled={busy}
-                              onClick={() => editReturn(i)}
-                            >
-                              Corrigir devolução
-                            </button>
-                          </article>
-                        ))}
+                        {inLoad.length === 0 ? (
+                          <p className="inline-empty">
+                            {backInDepot > 0
+                              ? "Os fardos coletados já foram devolvidos ao depósito."
+                              : "Os produtos coletados aparecerão aqui."}
+                          </p>
+                        ) : (
+                          inLoad.map((i) => (
+                            <article className="item-card collected" key={i.id}>
+                              <div className="item-top">
+                                <h3>{nameOf(i)}</h3>
+                                <span className="tag">
+                                  <Icon name="check" size={14} />
+                                  Coletado
+                                </span>
+                              </div>
+                              <p className="item-total">
+                                <strong>{sum(carried(i))} fardos</strong> na carga
+                              </p>
+                              <Breakdown {...carried(i)} />
+                              {carried(i).open > 0 && (
+                                <p className="opening-note">
+                                  Abrir {carried(i).open}{" "}
+                                  {carried(i).open === 1 ? "fardo" : "fardos"} na área de vendas
+                                </p>
+                              )}
+                              {sum(remaining(i)) > 0 && (
+                                <p className="muted">
+                                  Ainda falta buscar: {sum(remaining(i))} fardos.
+                                </p>
+                              )}
+                              {i.note && <p className="note">{i.note}</p>}
+                              <button
+                                className="secondary full return-button"
+                                disabled={busy}
+                                onClick={() => editReturn(i)}
+                              >
+                                <Icon name="return" size={18} />
+                                Realocar no depósito
+                              </button>
+                              <div className="item-tools">
+                                <button onClick={() => editCollection(i)}>Corrigir coleta</button>
+                                <button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    mutate(
+                                      (d) => collect(d, i.id, { closed: 0, open: 0 }),
+                                      "Coleta desfeita. O item voltou para buscar.",
+                                      true,
+                                    )
+                                  }
+                                >
+                                  Desfazer coleta
+                                </button>
+                                <button onClick={() => edit(i, "load")}>Editar</button>
+                                <button onClick={() => remove("load", i)}>Remover</button>
+                              </div>
+                            </article>
+                          ))
+                        )}
                       </section>
-                    )}
-                    <button
-                      className="secondary full finalize"
-                      disabled={busy}
-                      onClick={() => setFinishing(true)}
-                    >
-                      <Icon name="check" />
-                      Finalizar carga
-                    </button>
-                  </>
-                ) : (
-                  <section className="empty empty-load">
-                    <BoxStack />
-                    <h2>{data.finishedAt ? "Carga finalizada." : "Vamos montar sua carga?"}</h2>
-                    <p>
-                      {data.finishedAt
-                        ? "As pendências estão guardadas. Comece a próxima quando quiser."
-                        : "Anote o que falta. Cada fardo no seu lugar."}
-                    </p>
-                    <button className="primary full" onClick={() => openEditor(freshEditor())}>
-                      <Icon name="plus" size={20} />
-                      Montar minha carga
-                    </button>
-                  </section>
-                )}
-              </>
-            ) : tab === "pending" ? (
-              <>
-                <p className="intro">Você confere o depósito e decide quando tentar de novo.</p>
-                {data.pending.length === 0 ? (
-                  <section className="empty">
-                    <div className="empty-icon">
-                      <Icon name="clock" size={38} />
-                    </div>
-                    <h2>Nada aguardando por aqui.</h2>
-                    <p>
-                      Quando não encontrar um produto, toque em “Não tem” na carga. O saldo fica
-                      guardado aqui.
-                    </p>
-                  </section>
-                ) : (
-                  data.pending.map((i) => (
-                    <article className="item-card" key={i.id}>
-                      <h3>{nameOf(i)}</h3>
-                      <p className="item-total">
-                        Pendente: <strong>{sum(i)} fardos</strong>
-                      </p>
-                      <Breakdown {...i} />
-                      {i.note && <p className="note">{i.note}</p>}
+                      {inDepot.length > 0 && (
+                        <section className="list-section returned-section">
+                          <div className="section-heading">
+                            <h2>Devolvidos ao depósito</h2>
+                            <span>{backInDepot} fardos</span>
+                          </div>
+                          <p className="section-help">
+                            Já voltaram. Não estão na carga nem nas pendências.
+                          </p>
+                          {inDepot.map((i) => (
+                            <article className="item-card returned" key={i.id}>
+                              <div className="item-top">
+                                <h3>{nameOf(i)}</h3>
+                                <span className="tag">
+                                  <Icon name="return" size={14} />
+                                  Devolvido
+                                </span>
+                              </div>
+                              <Breakdown {...returned(i)} />
+                              <button
+                                className="secondary full"
+                                disabled={busy}
+                                onClick={() => editReturn(i)}
+                              >
+                                Corrigir devolução
+                              </button>
+                            </article>
+                          ))}
+                        </section>
+                      )}
                       <button
-                        className="primary full"
+                        className="secondary full finalize"
                         disabled={busy}
-                        onClick={() =>
-                          mutate(
-                            (d) => bring(d, i.id),
-                            "Pendência movida para a carga atual.",
-                            true,
-                          )
-                        }
+                        onClick={() => setFinishing(true)}
                       >
-                        <Icon name="plus" size={18} />
-                        Buscar nesta carga
+                        <Icon name="check" />
+                        Finalizar carga
                       </button>
-                      <div className="item-tools">
-                        <button onClick={() => edit(i, "pending")}>Editar</button>
-                        <button onClick={() => remove("pending", i)}>Remover</button>
+                    </>
+                  ) : (
+                    <section className="empty empty-load">
+                      <BoxStack />
+                      <h2>{data.finishedAt ? "Carga finalizada." : "Vamos montar sua carga?"}</h2>
+                      <p>
+                        {data.finishedAt
+                          ? "As pendências estão guardadas. Comece a próxima quando quiser."
+                          : "Anote o que falta. Cada fardo no seu lugar."}
+                      </p>
+                      <button className="primary full" onClick={() => openEditor(freshEditor())}>
+                        <Icon name="plus" size={20} />
+                        Montar minha carga
+                      </button>
+                    </section>
+                  )}
+                </>
+              ) : tab === "pending" ? (
+                <>
+                  <p className="intro">Você confere o depósito e decide quando tentar de novo.</p>
+                  {data.pending.length === 0 ? (
+                    <section className="empty">
+                      <div className="empty-icon">
+                        <Icon name="clock" size={38} />
                       </div>
-                    </article>
-                  ))
-                )}
-              </>
-            ) : (
-              <>
-                <p className="intro">Os nomes que você usa ficam salvos aqui.</p>
-                <label className="search">
-                  <Icon name="search" />
-                  <input
-                    aria-label="Buscar produto"
-                    placeholder="Buscar produto"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </label>
-                <div className="filters" aria-label="Filtrar produtos">
-                  {[
-                    ["recent", "Recentes"],
-                    ["favorites", "Favoritos"],
-                    ["all", "Todos"],
-                  ].map(([key, text]) => (
-                    <button
-                      key={key}
-                      className={filter === key ? "active" : ""}
-                      aria-pressed={filter === key}
-                      onClick={() => setFilter(key!)}
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </div>
-                {names.length ? (
-                  names.map(productRow)
-                ) : (
-                  <section className="empty">
-                    <div className="empty-icon">
-                      <Icon name="list" size={38} />
-                    </div>
-                    <h2>
-                      {query
-                        ? "Nenhum produto encontrado."
-                        : filter === "favorites"
-                          ? "Seus favoritos ficam aqui."
-                          : "Sua lista vai ganhando forma."}
-                    </h2>
-                    <p>
-                      {query
-                        ? "Você pode adicionar esse nome direto na carga."
-                        : filter === "favorites"
-                          ? "Toque em Favoritar ao lado de um produto para encontrá-lo mais rápido."
-                          : "Adicione seu primeiro produto à carga. O nome será lembrado na próxima vez."}
-                    </p>
-                  </section>
-                )}
-              </>
-            )}
-          </>
-        )}
-      </main>
-      {loaded && !subscreen && (
-        <footer className="bottom-bar">
-          {(tab !== "load" || data.load.length > 0) && (
-            <div className="add-area">
-              <button
-                disabled={busy}
-                className="primary full add-button"
-                onClick={() => openEditor(freshEditor())}
-              >
-                <Icon name="plus" />
-                Adicionar produto
-              </button>
-            </div>
+                      <h2>Nada aguardando por aqui.</h2>
+                      <p>
+                        Quando não encontrar um produto, toque em “Não tem” na carga. O saldo fica
+                        guardado aqui.
+                      </p>
+                    </section>
+                  ) : (
+                    data.pending.map((i) => (
+                      <article className="item-card" key={i.id}>
+                        <h3>{nameOf(i)}</h3>
+                        <p className="item-total">
+                          Pendente: <strong>{sum(i)} fardos</strong>
+                        </p>
+                        <Breakdown {...i} />
+                        {i.note && <p className="note">{i.note}</p>}
+                        <button
+                          className="primary full"
+                          disabled={busy}
+                          onClick={() =>
+                            mutate(
+                              (d) => bring(d, i.id),
+                              "Pendência movida para a carga atual.",
+                              true,
+                            )
+                          }
+                        >
+                          <Icon name="plus" size={18} />
+                          Buscar nesta carga
+                        </button>
+                        <div className="item-tools">
+                          <button onClick={() => edit(i, "pending")}>Editar</button>
+                          <button onClick={() => remove("pending", i)}>Remover</button>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="intro">Os nomes que você usa ficam salvos aqui.</p>
+                  <label className="search">
+                    <Icon name="search" />
+                    <input
+                      aria-label="Buscar produto"
+                      placeholder="Buscar produto"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                    />
+                  </label>
+                  <div className="filters" aria-label="Filtrar produtos">
+                    {[
+                      ["recent", "Recentes"],
+                      ["favorites", "Favoritos"],
+                      ["all", "Todos"],
+                    ].map(([key, text]) => (
+                      <button
+                        key={key}
+                        className={filter === key ? "active" : ""}
+                        aria-pressed={filter === key}
+                        onClick={() => setFilter(key!)}
+                      >
+                        {text}
+                      </button>
+                    ))}
+                  </div>
+                  {names.length ? (
+                    names.map(productRow)
+                  ) : (
+                    <section className="empty">
+                      <div className="empty-icon">
+                        <Icon name="list" size={38} />
+                      </div>
+                      <h2>
+                        {query
+                          ? "Nenhum produto encontrado."
+                          : filter === "favorites"
+                            ? "Seus favoritos ficam aqui."
+                            : "Sua lista vai ganhando forma."}
+                      </h2>
+                      <p>
+                        {query
+                          ? "Você pode adicionar esse nome direto na carga."
+                          : filter === "favorites"
+                            ? "Toque em Favoritar ao lado de um produto para encontrá-lo mais rápido."
+                            : "Adicione seu primeiro produto à carga. O nome será lembrado na próxima vez."}
+                      </p>
+                    </section>
+                  )}
+                </>
+              )}
+            </>
           )}
-          <nav aria-label="Áreas do aplicativo">
-            {(
-              [
-                { key: "load", label: "Minha carga", icon: "box" },
-                { key: "pending", label: "Aguardando chegar", icon: "clock" },
-                { key: "products", label: "Meus produtos", icon: "list" },
-              ] as const
-            ).map((t) => (
-              <button
-                key={t.key}
-                className={tab === t.key ? "selected" : ""}
-                aria-current={tab === t.key ? "page" : undefined}
-                onClick={() => {
-                  setTab(t.key);
-                  setError("");
-                }}
-              >
-                <Icon name={t.icon} />
-                <span>{t.label}</span>
-                {t.key === "pending" && data.pending.length > 0 && (
-                  <span className="nav-count">{data.pending.length}</span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </footer>
-      )}
-    </div>
+        </main>
+        {loaded && !subscreen && (
+          <footer className="bottom-bar">
+            {(tab !== "load" || data.load.length > 0) && (
+              <div className="add-area">
+                <button
+                  disabled={busy}
+                  className="primary full add-button"
+                  onClick={() => openEditor(freshEditor())}
+                >
+                  <Icon name="plus" />
+                  Adicionar produto
+                </button>
+              </div>
+            )}
+            <nav aria-label="Áreas do aplicativo">
+              {(
+                [
+                  { key: "load", label: "Minha carga", icon: "box" },
+                  { key: "pending", label: "Aguardando chegar", icon: "clock" },
+                  { key: "products", label: "Meus produtos", icon: "list" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  className={tab === t.key ? "selected" : ""}
+                  aria-current={tab === t.key ? "page" : undefined}
+                  onClick={() => {
+                    setTab(t.key);
+                    setError("");
+                  }}
+                >
+                  <Icon name={t.icon} />
+                  <span>{t.label}</span>
+                  {t.key === "pending" && data.pending.length > 0 && (
+                    <span className="nav-count">{data.pending.length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </footer>
+        )}
+      </div>
+    </>
   );
 }

@@ -5,21 +5,21 @@ import type { Quantities } from "./model";
 export function BoxStack() {
   return (
     <svg className="box-stack" viewBox="0 0 112 88" fill="none" aria-hidden="true">
-      <path d="M9 77h95" stroke="#c8d5ef" strokeWidth="2" strokeLinecap="round" />
+      <path d="M9 77h95" stroke="var(--blue-border)" strokeWidth="2" strokeLinecap="round" />
       <g transform="translate(7 31)">
-        <path d="m0 12 24-11 24 11v27L24 50 0 39Z" fill="#3165db" />
+        <path d="m0 12 24-11 24 11v27L24 50 0 39Z" fill="var(--box-blue)" />
         <path
           d="m0 12 24 11 24-11M24 23v27M12 6l24 11v9"
-          stroke="#edf3ff"
+          stroke="var(--box-blue-line)"
           strokeWidth="1.8"
           strokeLinejoin="round"
         />
       </g>
       <g transform="translate(54 31)">
-        <path d="m0 12 24-11 24 11v27L24 50 0 39Z" fill="#ffd85a" />
+        <path d="m0 12 24-11 24 11v27L24 50 0 39Z" fill="var(--accent)" />
         <path
           d="m0 12 24 11 24-11M24 23v27M12 6l24 11v9"
-          stroke="#83641e"
+          stroke="var(--box-yellow-line)"
           strokeWidth="1.8"
           strokeLinejoin="round"
         />
@@ -27,13 +27,13 @@ export function BoxStack() {
       <g transform="translate(31 1)">
         <path
           d="m0 12 24-11 24 11v27L24 50 0 39Z"
-          fill="#f2f6ff"
-          stroke="#9cb7ef"
+          fill="var(--blue-soft)"
+          stroke="var(--blue-border)"
           strokeWidth="1.8"
         />
         <path
           d="m0 12 24 11 24-11M24 23v27M12 6l24 11v9"
-          stroke="#5880c9"
+          stroke="var(--blue-ink)"
           strokeWidth="1.8"
           strokeLinejoin="round"
         />
