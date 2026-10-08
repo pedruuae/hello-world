@@ -1,3 +1,4 @@
+import { splitVolume, nameWithVolume, knownVolumeName, type VolumeUnit } from "./volume";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   add,
@@ -31,6 +32,8 @@ type Editor = {
   kind: "add" | "load" | "pending" | "collect" | "rename";
   id: string;
   name: string;
+  volume: string;
+  unit: VolumeUnit;
   closed: number;
   open: number;
   note: string;
@@ -40,7 +43,7 @@ type Editor = {
 const freshEditor = (name = ""): Editor => ({
   kind: "add",
   id: "",
-  name,
+  ...splitVolume(name),
   closed: 1,
   open: 0,
   note: "",
@@ -206,10 +209,18 @@ export default function App() {
     }
   }
   function edit(i: Item | Pending, kind: "load" | "pending") {
-    openEditor({ kind, id: i.id, name: nameOf(i), closed: i.closed, open: i.open, note: i.note });
+    openEditor({
+      ...freshEditor(nameOf(i)),
+      kind,
+      id: i.id,
+      closed: i.closed,
+      open: i.open,
+      note: i.note,
+    });
   }
   function editCollection(i: Item) {
     openEditor({
+      ...freshEditor(),
       kind: "collect",
       id: i.id,
       name: nameOf(i),
@@ -226,7 +237,17 @@ export default function App() {
   async function save(e: FormEvent) {
     e.preventDefault();
     if (!editor) return;
-    const v = editor;
+    let v = editor;
+    try {
+      if (v.kind !== "collect")
+        v = {
+          ...v,
+          name: knownVolumeName(nameWithVolume(v.name, v.volume, v.unit), data.products),
+        };
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Confira o volume informado.");
+      return;
+    }
     if (editorRevision.current !== data.revision) {
       setError(
         "A lista mudou enquanto você editava. Volte e abra o produto novamente para conferir as quantidades.",
@@ -509,7 +530,7 @@ export default function App() {
                       autoComplete="off"
                       maxLength={120}
                       required
-                      placeholder="Ex.: Açúcar 5 kg"
+                      placeholder="Ex.: Coca-Cola, suco de uva…"
                       value={editor.name}
                       onChange={(e) => setEditor({ ...editor, name: e.target.value })}
                     />
@@ -528,11 +549,47 @@ export default function App() {
                         <button
                           key={p.id}
                           type="button"
-                          onClick={() => setEditor({ ...editor, name: p.name })}
+                          onClick={() => setEditor({ ...editor, ...splitVolume(p.name) })}
                         >
                           {p.name}
                         </button>
                       ))}
+                  </div>
+                )}
+                {editor.kind !== "collect" && (
+                  <div className="volume-field">
+                    <label className="field-label" htmlFor="product-volume">
+                      Volume da bebida <span className="optional">opcional</span>
+                    </label>
+                    <div className="volume-controls">
+                      <input
+                        id="product-volume"
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        maxLength={9}
+                        placeholder={editor.unit === "mL" ? "Ex.: 350" : "Ex.: 1,5"}
+                        value={editor.volume}
+                        onChange={(e) => setEditor({ ...editor, volume: e.target.value })}
+                        aria-describedby="volume-hint"
+                      />
+                      <div className="volume-units" role="group" aria-label="Unidade do volume">
+                        {(["mL", "L"] as const).map((unit) => (
+                          <button
+                            key={unit}
+                            type="button"
+                            aria-pressed={editor.unit === unit}
+                            className={editor.unit === unit ? "selected" : ""}
+                            onClick={() => setEditor({ ...editor, unit })}
+                          >
+                            {unit}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <p id="volume-hint" className="hint">
+                      Volume de cada garrafa ou lata. A carga continua sendo contada em fardos.
+                    </p>
                   </div>
                 )}
                 {editor.kind !== "rename" && (

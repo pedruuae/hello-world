@@ -854,3 +854,11 @@ main {
 .app-header, .offline-status, .bottom-bar { flex-shrink: 0; }
 main { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; }
 .bottom-bar { position: static; }
+
+.volume-field { margin-top: 20px; }
+.volume-field .field-label { margin-bottom: 9px; }
+.volume-controls { display: flex; align-items: center; gap: 10px; }
+.volume-controls > input { flex: 1; width: 0; }
+.volume-units { display: flex; flex-shrink: 0; border: 1px solid #bccbc0; border-radius: 10px; overflow: hidden; }
+.volume-units button { border: 0; border-radius: 0; min-width: 52px; min-height: 50px; background: #fff; }
+.volume-units button.selected { background: #28543e; color: #fff; }
