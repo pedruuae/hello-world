@@ -1,3 +1,5 @@
+import { loadProgress } from "./progress";
+import { BoxStack, OpeningLogo, QuantityBoxes } from "./Polish";
 import { splitVolume, nameWithVolume, knownVolumeName, type VolumeUnit } from "./volume";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
@@ -56,12 +58,30 @@ function Counter({
   value,
   max = 99999,
   onChange,
+  onStep,
 }: {
   label: string;
   value: number;
   max?: number;
   onChange: (n: number) => void;
+  onStep: (delta: number) => void;
 }) {
+  const input = useRef<HTMLInputElement>(null);
+  const previous = useRef(value);
+  useEffect(() => {
+    if (previous.current === value) return;
+    previous.current = value;
+    if (!input.current?.animate || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
+      return;
+    const animation = input.current.animate(
+      [
+        { opacity: 0.6, transform: "translateY(2px)" },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 140, easing: "ease-out" },
+    );
+    return () => animation.cancel();
+  }, [value]);
   return (
     <div className="quantity-row">
       <label>
@@ -73,11 +93,12 @@ function Counter({
           type="button"
           aria-label={`Diminuir ${label}`}
           disabled={value <= 0}
-          onClick={() => onChange(Math.max(0, value - 1))}
+          onClick={() => onStep(-1)}
         >
           −
         </button>
         <input
+          ref={input}
           aria-label={label}
           type="number"
           inputMode="numeric"
@@ -92,7 +113,7 @@ function Counter({
           type="button"
           aria-label={`Aumentar ${label}`}
           disabled={value >= max}
-          onClick={() => onChange(Math.min(max, (value || 0) + 1))}
+          onClick={() => onStep(1)}
         >
           +
         </button>
@@ -164,6 +185,18 @@ export default function App() {
     if (main.current) main.current.scrollTop = 0;
     heading.current?.focus();
   }, [editor?.kind, menu, finishing, tab]);
+  useEffect(() => {
+    if (!notice || undo) return;
+    const timer = window.setTimeout(() => setNotice(""), 3500);
+    return () => clearTimeout(timer);
+  }, [notice, undo]);
+  function stepQuantity(key: "closed" | "open", delta: number) {
+    setEditor((current) => {
+      if (!current) return current;
+      const limit = (key === "closed" ? current.maxClosed : current.maxOpen) ?? 99999;
+      return { ...current, [key]: Math.min(limit, Math.max(0, (current[key] || 0) + delta)) };
+    });
+  }
   async function mutate(fn: (d: Data) => void, message: string, canUndo = false) {
     if (lock.current) return false;
     lock.current = true;
@@ -291,8 +324,10 @@ export default function App() {
         ? "Devolução registrada. Os fardos não viraram pendência."
         : v.kind === "collect"
           ? "Coleta atualizada."
-          : "Salvo no aparelho.",
-      v.kind === "return",
+          : v.kind === "add"
+            ? `${sum(v)} ${sum(v) === 1 ? "fardo adicionado" : "fardos adicionados"}`
+            : "Salvo no aparelho.",
+      v.kind === "return" || v.kind === "collect",
     );
     if (ok) {
       setEditor(null);
@@ -375,6 +410,8 @@ export default function App() {
   const left = toGet.reduce((a, i) => a + sum(remaining(i)), 0),
     got = inLoad.reduce((a, i) => a + sum(carried(i)), 0),
     backInDepot = inDepot.reduce((a, i) => a + sum(returned(i)), 0);
+  const progress = loadProgress(data.load);
+  const editorTotal = editor ? (editor.closed || 0) + (editor.open || 0) : 0;
   const names = data.products
     .filter((p) => normalize(p.name).includes(normalize(query)))
     .filter((p) => filter !== "favorites" || p.favorite)
@@ -422,6 +459,7 @@ export default function App() {
   }
   return (
     <div className="app-shell">
+      <OpeningLogo />
       <header className="app-header">
         <a
           className="brand"
@@ -434,9 +472,7 @@ export default function App() {
           <span className="brand-icon">
             <Icon name="box" size={25} />
           </span>
-          <span>
-            Meu Corredor<small>Uma carga de cada vez.</small>
-          </span>
+          <span>Meu Corredor</span>
         </a>
         <button
           className="menu-button"
@@ -615,6 +651,30 @@ export default function App() {
                         ))}
                       </div>
                     </div>
+                    <div className="volume-presets" role="group" aria-label="Volumes rápidos">
+                      {(
+                        [
+                          { volume: "350", unit: "mL" },
+                          { volume: "600", unit: "mL" },
+                          { volume: "1", unit: "L" },
+                          { volume: "2", unit: "L" },
+                        ] as const
+                      ).map((preset) => (
+                        <button
+                          key={preset.volume + preset.unit}
+                          type="button"
+                          aria-pressed={
+                            Number(editor.volume.replace(",", ".")) === Number(preset.volume) &&
+                            editor.unit === preset.unit
+                          }
+                          onClick={() =>
+                            setEditor((current) => (current ? { ...current, ...preset } : current))
+                          }
+                        >
+                          {preset.volume} {preset.unit}
+                        </button>
+                      ))}
+                    </div>
                     <p id="volume-hint" className="hint">
                       Volume de cada garrafa ou lata. A carga continua sendo contada em fardos.
                     </p>
@@ -627,15 +687,22 @@ export default function App() {
                         label="Fechados"
                         value={editor.closed}
                         {...(editor.maxClosed !== undefined ? { max: editor.maxClosed } : {})}
-                        onChange={(closed) => setEditor({ ...editor, closed })}
+                        onChange={(closed) =>
+                          setEditor((current) => (current ? { ...current, closed } : current))
+                        }
+                        onStep={(delta) => stepQuantity("closed", delta)}
                       />
                       <Counter
                         label="Pra abrir"
                         value={editor.open}
                         {...(editor.maxOpen !== undefined ? { max: editor.maxOpen } : {})}
-                        onChange={(open) => setEditor({ ...editor, open })}
+                        onChange={(open) =>
+                          setEditor((current) => (current ? { ...current, open } : current))
+                        }
+                        onStep={(delta) => stepQuantity("open", delta)}
                       />
                     </div>
+                    <QuantityBoxes closed={editor.closed} open={editor.open} />
                     <p className="hint">
                       {editor.kind === "return"
                         ? "Devolva somente fardos inteiros. As categorias indicam como você pretendia repor."
@@ -678,7 +745,9 @@ export default function App() {
                       ? "Confirmar devolução"
                       : editor.kind === "collect"
                         ? "Salvar coleta"
-                        : "Salvar produto"}
+                        : editor.kind === "add"
+                          ? `Adicionar ${editorTotal} ${editorTotal === 1 ? "fardo" : "fardos"} à carga`
+                          : "Salvar alterações"}
                 </button>
               </fieldset>
             </form>
@@ -853,24 +922,14 @@ export default function App() {
             {tab === "load" && (
               <section className="welcome">
                 <div>
-                  <p className="welcome-kicker">BORA PRA MAIS UMA CARGA</p>
                   <h2>Olá, Pedro Daniel!</h2>
                   <p>O que vamos repor hoje?</p>
                 </div>
-                <span className="welcome-icon">
-                  <Icon name="spark" size={25} />
-                </span>
+                <BoxStack />
               </section>
             )}
             <div className="page-heading">
               <div>
-                <p className="eyebrow">
-                  {tab === "load"
-                    ? "DO CORREDOR AO DEPÓSITO"
-                    : tab === "pending"
-                      ? "PARA CONFERIR DEPOIS"
-                      : "MENOS DIGITAÇÃO, MAIS AGILIDADE"}
-                </p>
                 <h1 ref={heading} tabIndex={-1}>
                   {tab === "load"
                     ? "Minha carga"
@@ -890,16 +949,53 @@ export default function App() {
               <>
                 {data.load.length > 0 ? (
                   <>
-                    <div className="load-summary">
-                      <div>
-                        <strong>{left}</strong>
-                        <span>fardos para buscar</span>
-                      </div>
-                      <div>
-                        <strong>{got}</strong>
-                        <span>fardos na carga</span>
-                      </div>
-                    </div>
+                    {progress.total > 0 && (
+                      <section className="load-overview" aria-label="Resumo da carga atual">
+                        <div className="load-summary">
+                          <div>
+                            <strong key={progress.left} className="metric-value">
+                              {progress.left}
+                            </strong>
+                            <span>Para buscar</span>
+                          </div>
+                          <div>
+                            <strong key={progress.collected} className="metric-value">
+                              {progress.collected}
+                            </strong>
+                            <span>Coletados</span>
+                          </div>
+                          <div className="open-metric">
+                            <strong key={progress.toOpen} className="metric-value">
+                              {progress.toOpen}
+                            </strong>
+                            <span>Pra abrir</span>
+                          </div>
+                        </div>
+                        <p className="summary-note">Pra abrir já está incluído nos coletados.</p>
+                        <div className="progress-label">
+                          <span>
+                            {progress.collected} de {progress.total} fardos coletados
+                          </span>
+                          <Icon name={progress.complete ? "check" : "box"} size={16} />
+                        </div>
+                        <div
+                          className="load-progress"
+                          role="progressbar"
+                          aria-label="Fardos coletados nesta carga"
+                          aria-valuemin={0}
+                          aria-valuemax={progress.total}
+                          aria-valuenow={progress.collected}
+                        >
+                          <span style={{ transform: `scaleX(${progress.percent / 100})` }} />
+                        </div>
+                        {progress.complete && (
+                          <p className="load-ready" role="status">
+                            <Icon name="check" size={18} />
+                            Carga separada. Bora descer!
+                          </p>
+                        )}
+                      </section>
+                    )}
                     <section className="list-section">
                       <div className="section-heading">
                         <h2>Para buscar</h2>
@@ -911,7 +1007,7 @@ export default function App() {
                         <p className="inline-empty">
                           <Icon name="check" />
                           {got > 0
-                            ? "Tudo coletado. Confira abaixo o que vai abrir."
+                            ? "Abra na área de vendas os fardos indicados abaixo."
                             : "Nenhum fardo para buscar. Confira as devoluções abaixo."}
                         </p>
                       ) : (
@@ -939,11 +1035,7 @@ export default function App() {
                                 className="primary"
                                 disabled={busy}
                                 onClick={() =>
-                                  mutate(
-                                    (d) => collect(d, i.id, i),
-                                    "Tudo coletado. A reposição ainda precisa ser feita.",
-                                    true,
-                                  )
+                                  mutate((d) => collect(d, i.id, i), "Fardos coletados.", true)
                                 }
                               >
                                 <Icon name="check" size={18} />
@@ -1086,26 +1178,18 @@ export default function App() {
                     </button>
                   </>
                 ) : (
-                  <section className="empty">
-                    <div className="empty-icon">
-                      <Icon name={data.finishedAt ? "check" : "box"} size={38} />
-                    </div>
-                    <h2>
-                      {data.finishedAt ? "Carga finalizada." : "Sua próxima carga começa aqui."}
-                    </h2>
+                  <section className="empty empty-load">
+                    <BoxStack />
+                    <h2>{data.finishedAt ? "Carga finalizada." : "Vamos montar sua carga?"}</h2>
                     <p>
                       {data.finishedAt
-                        ? "Pronto para outra? Adicione um produto para começar. Suas pendências continuam em Aguardando chegar."
-                        : "Viu o que falta na prateleira? Adicione o produto e quantos fardos precisa buscar."}
+                        ? "As pendências estão guardadas. Comece a próxima quando quiser."
+                        : "Anote o que falta. Cada fardo no seu lugar."}
                     </p>
-                    <div className="empty-tip">
-                      <Icon name="list" size={20} />
-                      <span>
-                        Fechados ou pra abrir.
-                        <br />
-                        Cada fardo no seu lugar.
-                      </span>
-                    </div>
+                    <button className="primary full" onClick={() => openEditor(freshEditor())}>
+                      <Icon name="plus" size={20} />
+                      Montar minha carga
+                    </button>
                   </section>
                 )}
               </>
@@ -1212,16 +1296,18 @@ export default function App() {
       </main>
       {loaded && !subscreen && (
         <footer className="bottom-bar">
-          <div className="add-area">
-            <button
-              disabled={busy}
-              className="primary full add-button"
-              onClick={() => openEditor(freshEditor())}
-            >
-              <Icon name="plus" />
-              Adicionar produto
-            </button>
-          </div>
+          {(tab !== "load" || data.load.length > 0) && (
+            <div className="add-area">
+              <button
+                disabled={busy}
+                className="primary full add-button"
+                onClick={() => openEditor(freshEditor())}
+              >
+                <Icon name="plus" />
+                Adicionar produto
+              </button>
+            </div>
+          )}
           <nav aria-label="Áreas do aplicativo">
             {(
               [

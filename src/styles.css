@@ -1094,3 +1094,360 @@ main {
     font-size: 8px;
   }
 }
+
+/* Compact welcome, truthful progress and interaction-linked motion. */
+.welcome {
+  position: relative;
+  min-height: 94px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: #edf2ff;
+  border-color: #dce5fb;
+  overflow: hidden;
+}
+.welcome::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 19px;
+  bottom: 19px;
+  width: 3px;
+  background: #efc542;
+  border-radius: 0 3px 3px 0;
+}
+.welcome h2 {
+  font-size: 19px;
+  line-height: 1.18;
+  margin-bottom: 7px;
+}
+.welcome p {
+  font-size: 12px;
+  color: #465b80;
+  line-height: 1.4;
+}
+.box-stack {
+  width: 83px;
+  height: 65px;
+  flex-shrink: 0;
+}
+.page-heading {
+  margin: 0 0 13px;
+}
+.page-heading h1 {
+  font-size: 25px;
+}
+.page-symbol {
+  width: 35px;
+  height: 35px;
+  border: 0;
+  border-radius: 9px;
+}
+.page-symbol svg {
+  width: 23px;
+  height: 23px;
+}
+.load-overview {
+  margin-bottom: 24px;
+}
+.load-summary {
+  margin: 0;
+  padding: 13px 0 10px;
+  border-bottom: 0;
+  align-items: center;
+}
+.load-summary > div {
+  width: 33.333%;
+  padding-left: 14px;
+}
+.load-summary > div:first-child {
+  border-right: 0;
+}
+.load-summary > div + div {
+  border-left: 1px solid #dbe3f2;
+}
+.load-summary strong {
+  font-size: 26px;
+  line-height: 1.2;
+}
+.load-summary span {
+  font-size: 11px;
+  color: #4c5e7c;
+}
+.load-summary .open-metric strong {
+  color: #725612;
+}
+.summary-note {
+  color: #65738c;
+  font-size: 10px;
+  margin: 1px 0 15px;
+}
+.progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #304b7a;
+  margin-bottom: 7px;
+}
+.load-progress {
+  height: 5px;
+  background: #e0e7f4;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.load-progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #2457d6;
+  border-radius: 8px;
+  transform-origin: left center;
+}
+.load-ready {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #274d9a;
+  font-size: 13px;
+  font-weight: 650;
+  margin: 12px 0 0;
+}
+.empty-load {
+  padding: 20px 6px 14px;
+  max-width: 330px;
+  margin: 0 auto;
+}
+.empty-load > .box-stack {
+  width: 108px;
+  height: 85px;
+  margin-bottom: 16px;
+}
+.empty-load h2 {
+  font-size: 21px;
+  margin-bottom: 9px;
+  max-width: none;
+}
+.empty-load p {
+  font-size: 13px;
+  margin-bottom: 19px;
+  line-height: 1.5;
+}
+.empty-load > button {
+  background: #ffda59;
+  color: #1d315c;
+  border-color: #efc94a;
+  min-height: 54px;
+  margin-top: 0;
+}
+.volume-presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.volume-presets button {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 7px 3px;
+  font-size: 12px;
+  font-weight: 600;
+  border-color: #d2ddef;
+  background: #fff;
+  color: #3b527a;
+}
+.volume-presets button[aria-pressed="true"] {
+  color: #214daf;
+  border-color: #9cb6ec;
+  background: #edf3ff;
+}
+.quantity-preview {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #edf2fb;
+}
+.quantity-preview-row {
+  height: 32px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.preview-label {
+  font-size: 12px;
+  color: #3f5277;
+  white-space: nowrap;
+}
+.preview-label strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.preview-boxes {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 124px;
+  justify-content: flex-end;
+  color: #2457d6;
+}
+.preview-boxes svg {
+  fill: #e2eaff;
+}
+.quantity-preview-row.open .preview-boxes {
+  color: #785c13;
+}
+.quantity-preview-row.open .preview-boxes svg {
+  fill: #ffda59;
+}
+.preview-more {
+  min-width: 29px;
+  font-size: 11px;
+  color: #465778;
+  font-weight: 650;
+  text-align: right;
+}
+.preview-zero {
+  color: #78849b;
+}
+.quantities {
+  margin-top: 19px;
+}
+.quantity-row {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+.stepper input {
+  font-variant-numeric: tabular-nums;
+}
+.alert.success {
+  padding: 6px 10px;
+  font-size: 12px;
+  gap: 4px;
+}
+.alert.success > span {
+  min-width: 100px;
+}
+.collected .tag {
+  white-space: nowrap;
+}
+/* Invisible without working CSS animation, never intercepts touch or keyboard. */
+.opening-logo {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 17px;
+  background: #f7f8fc;
+  pointer-events: none;
+  opacity: 0;
+}
+.opening-symbol {
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22px;
+  color: #ffe276;
+  background: #2457d6;
+}
+.opening-name {
+  color: #1d315c;
+  font-size: 27px;
+  font-weight: 750;
+  letter-spacing: -0.9px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .opening-logo {
+    animation: opening-screen 780ms ease-out both;
+  }
+  .opening-symbol {
+    animation: opening-symbol 300ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+  .opening-name {
+    animation: opening-name 250ms ease-out 120ms both;
+  }
+  @keyframes opening-screen {
+    0%,
+    73% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes opening-symbol {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes opening-name {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .load-progress > span {
+    transition: transform 180ms ease-out;
+  }
+  .metric-value,
+  .load-ready,
+  .collected .tag {
+    animation: action-confirm 160ms ease-out both;
+  }
+  @keyframes action-confirm {
+    from {
+      opacity: 0.55;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opening-logo {
+    display: none;
+  }
+}
+@media (max-width: 350px) {
+  .welcome {
+    padding: 13px;
+    min-height: 86px;
+    gap: 6px;
+  }
+  .welcome h2 {
+    font-size: 19px;
+  }
+  .welcome p {
+    font-size: 11px;
+  }
+  .welcome > .box-stack {
+    width: 66px;
+    height: 52px;
+  }
+  .load-summary > div {
+    padding-left: 10px;
+  }
+  .load-summary > div:first-child {
+    padding-left: 0;
+  }
+  .quantity-preview {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+}

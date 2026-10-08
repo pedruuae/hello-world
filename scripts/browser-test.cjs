@@ -24,8 +24,10 @@ const path = require("node:path");
   bind(page);
   const url = process.env.APP_URL || "http://127.0.0.1:4173/";
   const visible = (text) => page.getByText(text, { exact: true }).waitFor();
-  const click = (text) => {
-    console.log("Click:", text);
+  const click = async (text) => {
+    if (text === "Salvar produto") return page.locator('.editor button[type="submit"]').click();
+    if (text === "Adicionar produto")
+      return page.getByRole("button", { name: /^(Adicionar produto|Montar minha carga)$/ }).click();
     return page.getByRole("button", { name: text, exact: true }).click();
   };
   const state = () =>
@@ -175,11 +177,11 @@ const path = require("node:path");
   await page.getByLabel("Nome do produto").fill("Teste teclado");
   await page.setViewportSize({ width: 320, height: 310 });
   await page.getByLabel("Observação").fill("Viewport reduzido simula a área ocupada pelo teclado.");
-  await page.getByRole("button", { name: "Salvar produto", exact: true }).scrollIntoViewIfNeeded();
+  await page.locator('.editor button[type="submit"]').scrollIntoViewIfNeeded();
   await screenshot("keyboard-simulated-320");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await click("Salvar produto");
-  await visible("Salvo no aparelho.");
+  await visible("1 fardo adicionado");
   await page.setViewportSize({ width: 360, height: 740 });
   await click("Finalizar carga");
   await visible("Mover saldo e finalizar");
@@ -236,10 +238,10 @@ const path = require("node:path");
   let reopened = persisted.pages()[0] || (await persisted.newPage());
   await reopened.goto(url);
   await reopened.getByText("Pronto para usar offline", { exact: true }).waitFor();
-  await reopened.getByRole("button", { name: "Adicionar produto", exact: true }).click();
+  await reopened.getByRole("button", { name: "Montar minha carga", exact: true }).click();
   await reopened.getByLabel("Nome do produto").fill("Arroz após reiniciar");
-  await reopened.getByRole("button", { name: "Salvar produto", exact: true }).click();
-  await reopened.getByText("Salvo no aparelho.", { exact: true }).waitFor();
+  await reopened.locator('.editor button[type="submit"]').click();
+  await reopened.getByText("1 fardo adicionado", { exact: true }).waitFor();
   await persisted.close();
   persisted = await chromium.launchPersistentContext(profile, {
     ...opts,

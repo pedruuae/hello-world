@@ -79,3 +79,14 @@ O formato dos dados/backup agora é **versão 2**, com migração de backups e d
 Visual: base azul, detalhes amarelos, saudação pessoal de teste “Olá, Pedro Daniel! O que vamos repor hoje?” e transições CSS curtas. Sem biblioteca de animação, efeitos contínuos ou recursos remotos. `prefers-reduced-motion` desativa os movimentos.
 
 Verificação adicional: 11 testes unitários/roteamento passaram. `scripts/returns-browser-test.cjs` verificou em produção migração v1, devolução parcial/total, correção repetida, desfazer, transferência exclusiva do saldo real, restauração de backup v2, recarga offline, largura 320 px e redução de movimento. Continua pendente validar o J7 físico.
+
+
+## Refinamento da interação e abertura — 08/10/2026
+
+A tela inicial usa caixas em SVG local, saudação compacta e estado vazio com **Montar minha carga**. O resumo apresenta saldo para buscar, fardos físicos coletados e quantos desses serão abertos. O progresso é `coletados / (coletados + saldo para buscar)`: não soma “pra abrir” novamente e exclui fardos devolvidos e saldos já transferidos para pendências. **Carga separada. Bora descer!** só aparece com uma carga física não vazia, sem saldo para buscar; não finaliza a reposição.
+
+A logo abre em 780 ms, uma vez por sessão da aba (sessionStorage, com proteção em memória quando indisponível). O carregamento e a gravação nunca aguardam animação. A camada não intercepta eventos, some ao primeiro toque/tecla e é invisível se a animação CSS não funcionar. Redução de movimento pula a abertura; navegar, salvar ou voltar do segundo plano não a repete.
+
+Os contadores mantêm o input nativo, aceitam toques rápidos usando atualização funcional e animam o número sem recriar o campo nem perder foco. Os ícones mostram no máximo quatro caixas por categoria e `+N`, em área de altura fixa. Atalhos 350 mL, 600 mL, 1 L e 2 L preenchem os campos existentes. Confirmações só aparecem após commit da transação; coleta parcial também permite desfazer. Nenhuma mudança no esquema de dados ou nas regras de devolução.
+
+Verificação: TypeScript, build e 12 testes unitários/roteamento passaram. `scripts/polish-browser-test.cjs` verificou abertura de sessão, CSS de animação indisponível, redução de movimento, 20 incrementos no mesmo ciclo de eventos, altura estável e ícones limitados, volumes, progresso, devoluções, pendências e funcionamento offline em 320/360 px. A suíte geral confirmou CRUD, falha de gravação, backup e encerramento/reinício do navegador offline. Teclado foi simulado reduzindo a viewport; desempenho e teclado do Galaxy J7 físico continuam não testados.
